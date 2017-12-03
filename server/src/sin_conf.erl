@@ -20,4 +20,4 @@ get_master_conf(Config) ->
   proplists:get_value(master_config, Config, [{enabled, false}]).
 
 is_enabled(ElementConfig) when erlang:is_list(ElementConfig) ->
-  proplists:get_value(enabled, ElementConfig, false).
+  proplists:get_value(enabled, ElementConfig, true).
