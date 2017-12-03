@@ -16,14 +16,15 @@ run_master_server(MasterConfig) ->
 tcp_listen(MasterConfig) ->
   Options = [
     binary,
+    {packet, 4},
     {active, false},
     {keepalive, true},
-    {packet, 4},
     {port, proplists:get_value(slaves_port, MasterConfig, 0)},
-    {ip, proplists:get_value(interface_ip, MasterConfig, "127.0.0.1")},
+    {ifaddr, proplists:get_value(interface_ip, MasterConfig, {127,0,0,1})},
     proplists:get_value(inet, MasterConfig, inet)
   ],
-  case gen_tcp:listen(0,Options) of
+  io:format("tcp_listen options:~p~n", [Options]),
+  case gen_tcp:listen(0, Options) of
     {ok, ListenSocket} -> tcp_listen_ok(ListenSocket);
     {error, _Reason} -> error
   end.
