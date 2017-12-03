@@ -1,4 +1,4 @@
--module(sin_master).
+-module(sin_master_networking).
 -export([
   start/1
 ]).
@@ -37,16 +37,20 @@ tcp_listen_ok(ListenSocket) ->
   tcp_accept(ListenSocket).
 
 tcp_accept(ListenSocket) ->
+  io:format("Waiting for slaves...~n"),
   case gen_tcp:accept(ListenSocket) of
     {ok, Socket} -> tcp_accept_ok(Socket);
     {error, _Reason} -> error
   end,
+  io:format("Closing socket...~n"),
   gen_tcp:close(ListenSocket).
 
 tcp_accept_ok(Socket) ->
+  io:format("Slave connected!~n"),
   tcp_listen_socket(Socket).
 
 tcp_listen_socket(Socket) ->
+  io:format("~p~n",[?FUNCTION_NAME]),
   case gen_tcp:recv(Socket, 0) of
     {ok, Data} -> tcp_recv(Data);
     {error, _Reason} -> error
