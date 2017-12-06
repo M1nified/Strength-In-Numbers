@@ -1,0 +1,13 @@
+ <config>
+    <slave_config>
+        <enabled>true</enabled>
+        <master_ip>{127.0.0.1}</master_ip>
+        <interface_ip>{127.0.0.1}</interface_ip>
+        <master_port>3456</master_port>
+    </slave_config>
+    <master_config>
+        <enabled>true</enabled>
+        <interface_ip>{127.0.0.1}</interface_ip>
+        <slaves_port>6543</slaves_port>
+    </master_config>
+ </config>
