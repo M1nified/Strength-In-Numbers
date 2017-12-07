@@ -76,7 +76,7 @@ handle_accept(ListenSocket) ->
 
 open(HunterConfig) ->
   case gen_server:start_link(sin_labor_office, HunterConfig, []) of
-    {ok, Pid} -> Pid;
+    {ok, Pid} -> {ok, Pid};
     {error, _Error} -> error;
     ignore -> ignore
   end.

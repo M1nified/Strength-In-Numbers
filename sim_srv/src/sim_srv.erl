@@ -10,7 +10,11 @@
 %% escript Entry point
 main(Args) ->
     io:format("Args: ~p~n", [Args]),
-    timer:sleep(1000),
+    {ok, LaborOffice} = sin_labor_office:open([{slaves_port, 3456}]),
+    gen_server:cast(LaborOffice, {tcp_listen}),
+    receive
+        Any -> io:format("Rec ~p~n",[Any])
+    end,
     erlang:halt(0).
 
 %%====================================================================

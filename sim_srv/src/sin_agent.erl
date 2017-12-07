@@ -28,7 +28,7 @@ handle_cast({tcp_accept, ListenSocket, Ref}, State) ->
     {ok, Socket} ->
       io:format("~p ~p tcp_accept (2.1) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
       {noreply, State#state{socket=Socket}};
-      _ -> 
+    _ -> 
       io:format("~p ~p tcp_accept (2.2) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
       {noreply, State}
   end;
