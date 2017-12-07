@@ -34,7 +34,7 @@ tcp_listen(Hunter) ->
   Options = [
     binary,
     {packet, 4},
-    {active, false},
+    {active, true},
     {keepalive, true},
     {port, proplists:get_value(slaves_port, Hunter#hunter.config, 0)},
     {ifaddr, proplists:get_value(interface_ip, Hunter#hunter.config, {127,0,0,1})},

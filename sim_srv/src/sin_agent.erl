@@ -41,8 +41,13 @@ handle_call(Request, _From, State) ->
   io:format("handle_call: ~p~n", [Request]),
   {noreply, State}.
 
-handle_info({tcp, _Socket, Msg}, State) ->
+handle_info({tcp, _Socket, MsgBin}, State) ->
+  Msg = erlang:binary_to_term(MsgBin),
   io:format("handle_info tcp: ~p~n", [Msg]),
+  {noreply, State};
+  
+handle_info(Any, State) ->
+  io:format("handle_info any: ~p~n", [Any]),
   {noreply, State}.
 
 terminate(_Reason, _Tab) -> ok.
@@ -54,14 +59,14 @@ code_change(_OldVersion, Tab, _Extra) -> {ok, Tab}.
 spawn() ->
   io:format("~p ~p ~n", [?MODULE, ?FUNCTION_NAME]),
   case gen_server:start_link(?MODULE, [], []) of
-    {ok, Pid} -> {ok, Pid};
+    {ok, Pid} -> io:format("p1 ~p p2 ~p~n",[self(),Pid]), {ok, Pid};
     {error, _Error} -> error;
     ignore -> ignore
   end.
 
 spawn(Socket) ->
   case gen_server:start_link(?MODULE, [{socket, Socket}], []) of
-    {ok, Pid} -> {ok, Pid};
+    {ok, Pid} -> io:format("p1 ~p p2 ~p~n",[self(),Pid]), {ok, Pid};
     {error, _Error} -> error;
     ignore -> ignore
   end.
