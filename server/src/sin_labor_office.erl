@@ -6,7 +6,7 @@
 -export([terminate/2, code_change/3]).
 
 -behaviour(sin_hunter).
--export([handle_capture/2]).
+-export([handle_accept/1]).
 
 -export([
   open/1
@@ -23,9 +23,27 @@
 
 init(HunterConfig) ->
   erlang:register(sin_labor_office, erlang:self()),
-  Hunter = sin_hunter:spawn(HunterConfig, sin_labor_office),
+  Hunter = sin_hunter:make(HunterConfig, ?MODULE),
   {ok, #state{hunter=Hunter}}.
+
+handle_cast({tcp_listen}, State) ->
+  io:format("~p ~p tcp_listen ~n", [?MODULE, ?FUNCTION_NAME]),
+  sin_hunter:tcp_listen(State#state.hunter),
+  {noreply, State};
   
+handle_cast({tcp_accept, ListenSocket}, State)->
+  io:format("~p ~p tcp_accept (1) ~n", [?MODULE, ?FUNCTION_NAME]),
+  case sin_agent:spawn() of
+    {ok, Pid} ->
+      io:format("~p ~p tcp_accept (2.1) ~n", [?MODULE, ?FUNCTION_NAME]),
+      Ref = erlang:make_ref(),
+      gen_server:cast(Pid, {tcp_accept, ListenSocket, Ref}),
+      {noreply, State};
+    _ -> 
+      io:format("~p ~p tcp_accept (2.2) ~n", [?MODULE, ?FUNCTION_NAME]),
+      {noreply, State}
+  end;
+
 handle_cast(Request, State) ->
   io:format("handle_cast: ~p~n", [Request]),
   {noreply, State}.
@@ -36,9 +54,13 @@ handle_call(Request, _From, State) ->
 
 handle_info({capture, HunterRef, {socket, Socket}}, State) ->
   case sin_hunter:get_ref(State#state.hunter) of
-    HunterRef -> add_agent(State, Socket);
+    HunterRef -> {noreply, add_agent(State, Socket)};
     _ -> {noreply, State}
-  end.
+  end;
+
+handle_info(OtherInfo, State) ->
+  io:format("~p ~p ~p~n",[?MODULE,?FUNCTION_NAME,OtherInfo]),
+  {noreply, State}.
 
 terminate(_Reason, _Tab) -> ok.
 
@@ -47,8 +69,8 @@ code_change(_OldVersion, Tab, _Extra) -> {ok, Tab}.
 % ---
 % sin_hunter
 
-handle_capture(Hunter, Socket) ->
-  {report, {capture, sin_hunter:get_ref(Hunter), {socket, Socket}}}.
+handle_accept(ListenSocket) ->
+  gen_server:cast(self(), {tcp_accept, ListenSocket}).
 
 % ---
 
