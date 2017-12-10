@@ -8,7 +8,8 @@
 -export([spawn/0, spawn/1]).
 
 -record(state,{
-  socket :: gen_tcp:socket()
+  socket :: gen_tcp:socket(),
+  ref :: reference()
 }).
 
 init(Args) when erlang:is_list(Args) ->      
@@ -22,12 +23,14 @@ init(Socket) ->
   io:format("sin_agent init~n"),
   {ok, #state{socket=Socket}}.
   
-handle_cast({tcp_accept, ListenSocket, Ref}, State) ->
+handle_cast({tcp_accept, ListenSocket, From, Ref}, State) ->
   io:format("~p ~p tcp_accept (1) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
   case gen_tcp:accept(ListenSocket) of
     {ok, Socket} ->
       io:format("~p ~p tcp_accept (2.1) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
-      {noreply, State#state{socket=Socket}};
+      gen_server:cast(From, {tcp_accepted, Ref}),
+      gen_server:cast(From, {tcp_accept, ListenSocket}), % will keep the same amount of acceptors all the time
+      {noreply, State#state{socket=Socket, ref=Ref}};
     _ -> 
       io:format("~p ~p tcp_accept (2.2) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
       {noreply, State}
