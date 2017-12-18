@@ -43,6 +43,8 @@ select_role_and_run("master") ->
     ok;
 select_role_and_run("slave") ->
     io:format("Starting slave server!~n"),
+    {ok, SlaveHead} = sin_slave_head:rise(),
+    sin_slave_head:find_master(SlaveHead),
     ok;
 select_role_and_run(_UnknownRole) ->
     {error, unknown_role}.
