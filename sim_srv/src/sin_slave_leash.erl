@@ -2,20 +2,22 @@
 
 -export([init/2, init/3]).
 
+-include("./sin_task.hrl").
+
 -record(state, {
   socket :: gen_tcp:socket(),
   head_pid :: pid(),
-  ref :: reference(),
+  head_ref :: reference(),
   tcp_options :: [{atom(), any()}]
 }).
 
 init(HeadPid, Ref) ->
-  State = #state{head_pid=HeadPid, ref=Ref, tcp_options=[]},
+  State = #state{head_pid=HeadPid, head_ref=Ref, tcp_options=[]},
   find_pole(State),
   ok.
 
 init(HeadPid, Ref, TcpOptions) when erlang:is_list(TcpOptions)->
-  State = #state{head_pid=HeadPid, ref=Ref, tcp_options=TcpOptions},
+  State = #state{head_pid=HeadPid, head_ref=Ref, tcp_options=TcpOptions},
   find_pole(State),
   ok.
 
@@ -62,6 +64,12 @@ loop(State) ->
   end.
 
 % ---
+
+tcp_recv(State, {run_task, Task}) ->
+  loop(State);
+
+tcp_recv(State, {update_modules, Modules}) when erlang:is_list(Modules) ->
+  loop(State);
 
 tcp_recv(State, _Msg) ->
   loop(State).
