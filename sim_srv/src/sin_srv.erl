@@ -1,4 +1,4 @@
--module(sim_srv).
+-module(sin_srv).
 
 %% API exports
 -export([main/1]).

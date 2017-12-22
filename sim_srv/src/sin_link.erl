@@ -1,4 +1,4 @@
--module(sim_link).
+-module(sin_link).
 
 -behaviour(gen_server).
 -export([init/1]).

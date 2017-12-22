@@ -1,4 +1,4 @@
-sim_srv
+sin_srv
 =====
 
 An escript
@@ -11,4 +11,4 @@ Build
 Run
 ---
 
-    $ _build/default/bin/sim_srv
+    $ _build/default/bin/sin_srv
