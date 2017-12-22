@@ -1,6 +1,7 @@
--module(sim_dep).
+-module(sin_dep).
 
 -export([needs/1]).
+-export([filter_loaded/1]).
 
 needs(Modules) when erlang:is_list(Modules) ->
   Deps = lists:flatmap(fun (Module) -> needs(Module) end, Modules),
@@ -47,3 +48,16 @@ chunks_to_modules(Chunks) when erlang:is_list(Chunks) ->
   Modules = lists:map(fun ({Module,_Function,_Arity}) -> Module end, Chunks),
   lists:usort(Modules).
   
+% ---
+
+is_loaded(Module) ->
+  case code:is_loaded(Module) of
+    false -> false;
+    _ -> true
+  end.
+
+filter_loaded(Modules) when erlang:is_list(Modules) ->
+  lists:filter(fun (Module) -> is_loaded(Module) end, Modules);
+
+filter_loaded(_) ->
+  [].
