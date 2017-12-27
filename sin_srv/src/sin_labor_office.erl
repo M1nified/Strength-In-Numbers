@@ -90,6 +90,9 @@ handle_call({add_task, Module, Function, Args}, _From, State) ->
       {reply, {error, timeout}, State}
   end;
 
+handle_call({get_best_slave}, _From, State) ->
+  {reply, not_implemented, State};
+
 handle_call(Request, _From, State) ->
   io:format("handle_call: ~p~n", [Request]),
   {noreply, State}.
