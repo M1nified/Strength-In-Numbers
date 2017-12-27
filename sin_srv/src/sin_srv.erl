@@ -37,11 +37,16 @@ start_services(_RegisterResult, _Args) ->
     {error, "Failed."}.
 
 select_role_and_run("master") ->
+    select_role_and_run(master);
+select_role_and_run("slave") ->
+    select_role_and_run(slave);
+
+select_role_and_run(master) ->
     io:format("Starting master server!~n"),
     {ok, LaborOffice} = sin_labor_office:open([{slaves_port, 3456}]),
     gen_server:cast(LaborOffice, {tcp_listen}),
     ok;
-select_role_and_run("slave") ->
+select_role_and_run(slave) ->
     io:format("Starting slave server!~n"),
     {ok, SlaveHead} = sin_slave_head:rise(),
     sin_slave_head:find_master(SlaveHead),
