@@ -19,7 +19,8 @@
   acceptors :: [{reference(), pid()}],
   agents :: [{reference(),{
     pid(), [{term(), any()}]
-  }}]
+  }}],
+  scheduler :: pid()
 }).
 
 % ---
@@ -28,10 +29,13 @@
 init(HunterConfig) ->
   erlang:register(?MODULE, erlang:self()),
   Hunter = sin_hunter:make(HunterConfig, ?MODULE),
+  Scheduler = sin_master_scheduler:start(),
+  Scheduler ! {labor_office, self(), undefined},
   {ok, #state{
     hunter=Hunter, 
     acceptors=[],
-    agents=[]
+    agents=[],
+    scheduler=Scheduler
   }}.
 
 handle_cast({tcp_listen}, State) ->
@@ -74,6 +78,17 @@ handle_cast({info, show_state}, State) ->
 handle_cast(Request, State) ->
   io:format("handle_cast: ~p~n", [Request]),
   {noreply, State}.
+
+handle_call({add_task, Module, Function, Args}, _From, State) ->
+  Ref = erlang:make_ref(),
+  State#state.scheduler ! {add_task, Module, Function, Args, self(), Ref},
+  receive
+    {task_sim, Ref, TaskSimPid} ->
+      {reply, {ok, TaskSimPid}, State}
+  after
+    5000 ->
+      {reply, {error, timeout}, State}
+  end;
 
 handle_call(Request, _From, State) ->
   io:format("handle_call: ~p~n", [Request]),

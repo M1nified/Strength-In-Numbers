@@ -9,7 +9,8 @@
 
 -record(state,{
   parent :: pid(),
-  ref :: reference()
+  ref :: reference(),
+  service :: pid()
 }).
 
 init(Args) ->
@@ -18,9 +19,29 @@ init(Args) ->
     ref=proplists:get_value(ref, Args)
     }}.
 
+handle_cast({LinkRef, {service, ServicePid}}, State) ->
+  io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, {service, ServicePid}]),
+  case State#state.ref of 
+    LinkRef ->
+      NewState = State#state{service=ServicePid};
+    _ ->
+      NewState = State
+  end,
+  {noreply, NewState};
+
 handle_cast(Request, State) ->
   io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
+
+handle_call({LinkRef, {spawn, Module, Function, Args}}, _From, State) ->
+  io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, {spawn, Module, Function, Args}]),
+  case State#state.ref of
+    LinkRef ->
+      {ok, Pid} = gen_server:call(State#state.service, {add_task, Module, Function, Args}), 
+      {reply, {ok, Pid}, State};
+    _ ->
+      {reply, {error}, State}
+  end;
 
 handle_call(Request, _From, State) ->
   io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
