@@ -1,5 +1,7 @@
 -module(sin_agent).
 
+-define(INTERVAL, 1000).
+
 -behaviour(gen_server).
 -export([init/1]).
 -export([handle_cast/2, handle_call/3, handle_info/2]).
@@ -7,21 +9,35 @@
 
 -export([spawn/0, spawn/1]).
 
+-include("./sin_system_load.hrl").
+
 -record(state,{
   socket :: gen_tcp:socket(),
-  ref :: reference()
+  ref :: reference(),
+  system_load :: sin_system_load(),
+  system_load_update_ref :: reference()
 }).
 
 init(Args) when erlang:is_list(Args) ->      
   io:format("~p ~p ~n", [?MODULE, ?FUNCTION_NAME]),
+  init_loops(),
   case proplists:get_value(socket, Args) of
-    undefined -> {ok, #state{}};
+    undefined -> {ok, init_state(#state{})};
     Socket -> init(Socket)
   end;
 
 init(Socket) ->
   io:format("sin_agent init~n"),
-  {ok, #state{socket=Socket}}.
+  init_loops(),
+  {ok, init_state(#state{socket=Socket})}.
+
+init_loops() ->
+  erlang:start_timer(0, self(), update_system_load, [{abs, false}]).
+
+init_state(State) ->
+  State#state{
+    system_load=#sin_system_load{cpu_avg_1=256, cpu_avg_5=256, cpu_avg_15=256}
+  }.
   
 handle_cast({tcp_accept, ListenSocket, From, Ref}, State) ->
   io:format("~p ~p tcp_accept (1) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
@@ -36,18 +52,44 @@ handle_cast({tcp_accept, ListenSocket, From, Ref}, State) ->
       {noreply, State}
   end;
 
+handle_cast({update_system_load}, State=#state{system_load_update_ref=undefined}) ->
+  io:format("[~p:~p][{update_system_load}] ~n", [?MODULE, ?FUNCTION_NAME]),
+  case State#state.socket of
+    undefined -> 
+      io:format("[~p:~p][{update_system_load}] Socket unavailable. ~n", [?MODULE, ?FUNCTION_NAME]),
+      {noreply, State};
+    Socket -> 
+      io:format("[~p:~p][{update_system_load}] Socket available. ~n", [?MODULE, ?FUNCTION_NAME]),
+      Ref = erlang:make_ref(),
+      Result = gen_tcp:send(Socket, erlang:term_to_binary({get_system_load, Ref})),
+      io:format("[~p:~p][{update_system_load}] tcp send result:~p ~n", [?MODULE, ?FUNCTION_NAME, Result]),
+      {noreply, State#state{system_load_update_ref=Ref}}
+  end;
+handle_cast({update_system_load}, State) ->
+  {noreply, State};
+
 handle_cast(Request, State) ->
   io:format("handle_cast: ~p~n", [Request]),
   {noreply, State}.
+
+handle_call({get_system_load}, _From, State) ->
+  {reply, State#state.system_load, State};
 
 handle_call(Request, _From, State) ->
   io:format("handle_call: ~p~n", [Request]),
   {noreply, State}.
 
+handle_info({timeout, TimeRef, update_system_load}, State) ->
+  io:format("[~p][loop][update_system_load] ~p~n", [?MODULE, TimeRef]),
+  gen_server:cast(self(), {update_system_load}),
+  TimerRef = erlang:start_timer(?INTERVAL, self(), update_system_load, [{abs, false}]),
+  io:format("[~p][loop][update_system_load] TimerRef: ~p~n", [?MODULE, TimerRef]),
+  {noreply, State};
+
 handle_info({tcp, _Socket, MsgBin}, State) ->
   Msg = erlang:binary_to_term(MsgBin),
   io:format("handle_info tcp: ~p~n", [Msg]),
-  {noreply, State};
+  tcp_recv(Msg, State);
   
 handle_info(Any, State) ->
   io:format("handle_info any: ~p~n", [Any]),
@@ -73,3 +115,12 @@ spawn(Socket) ->
     {error, _Error} -> error;
     ignore -> ignore
   end.
+
+% ---
+
+tcp_recv({system_load, ReqRef, SystemLoad}, State=#state{system_load_update_ref=ReqRef}) ->
+  {noreply, State#state{system_load=SystemLoad, system_load_update_ref=undefined}};
+
+tcp_recv(Msg, State) ->
+  io:format("[~p:~p/~p] ~p~n", [?MODULE, ?FUNCTION_NAME, ?FUNCTION_ARITY, Msg]),
+  {noreply, State}.

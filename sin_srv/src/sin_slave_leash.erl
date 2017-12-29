@@ -32,7 +32,7 @@ tcp_connect(State) ->
     [
       binary,
       {packet, 4},
-      {active, false},
+      {active, true},
       {keepalive, true}
     ]
   ) of
@@ -55,31 +55,38 @@ leave_loop(State) ->
   gen_tcp:close(State#state.socket).
 
 loop(State) ->
+  io:format("[~p:~p][loop] State: ~p~n", [?MODULE, ?FUNCTION_NAME, State]),
   Socket = State#state.socket,
   receive
     {tcp, Socket, MsgBin} ->
       Msg = erlang:binary_to_term(MsgBin),
-      tcp_recv(State, Msg);
+      tcp_recv(Msg, State);
     {send_to_master, Data} ->
       send_to_master(State, Data);
-    _ -> loop(State)
+    Any ->
+      io:format("[~p:~p] Msg: ~p~n", [?MODULE, ?FUNCTION_NAME, Any]), 
+      loop(State)
   end.
 
 % ---
 
-tcp_recv(State, {get_system_load}) ->
+tcp_recv({get_system_load, ReqRef}, State) ->
+  io:format("[get_system_load] Master asked for system load update.~n"),
   sin_system_load:start(),
   SystemLoad = sin_system_load:get_system_load(),
-  gen_tcp:send(State#state.socket, erlang:term_to_binary(SystemLoad)),
+  io:format("[get_system_load] System load: ~p~n", [SystemLoad]),
+  SendResult = gen_tcp:send(State#state.socket, erlang:term_to_binary({system_load, ReqRef, SystemLoad})),
+  io:format("[get_system_load] SendResult: ~p~n", [SendResult]),
   loop(State);
 
-tcp_recv(State, {run_task, Task}) ->
+tcp_recv({run_task, Task}, State) ->
   loop(State);
 
-tcp_recv(State, {update_modules, Modules}) when erlang:is_list(Modules) ->
+tcp_recv({update_modules, Modules}, State) when erlang:is_list(Modules) ->
   loop(State);
 
-tcp_recv(State, _Msg) ->
+tcp_recv(Msg, State) ->
+  io:format("[~p:~p/~p][any] Msg: ~p~n", [?MODULE, ?FUNCTION_NAME, ?FUNCTION_ARITY, Msg]),
   loop(State).
 
 send_to_master(State, Msg) ->
