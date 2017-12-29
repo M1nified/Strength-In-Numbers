@@ -67,6 +67,12 @@ loop(State) ->
 
 % ---
 
+tcp_recv(State, {get_system_load}) ->
+  sin_system_load:start(),
+  SystemLoad = sin_system_load:get_system_load(),
+  gen_tcp:send(State#state.socket, erlang:term_to_binary(SystemLoad)),
+  loop(State);
+
 tcp_recv(State, {run_task, Task}) ->
   loop(State);
 
