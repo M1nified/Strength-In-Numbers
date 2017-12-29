@@ -46,6 +46,7 @@ assign_task(State=#state{task_queue=[Task|Queue]}) ->
 assign_task_2(TaskResponse, _BestSlave={ok, Agent}, State) ->
     State.
 
+-spec recv(tuple(), #state{}) -> any().
 recv({labor_office, LaborOffice, LaborOfficeRef}, State) ->
     loop(State#state{labor_office=LaborOffice, labor_office_ref=LaborOfficeRef});
 
