@@ -12,14 +12,19 @@
 }).
 
 init(HeadPid, Ref) ->
+  init_elements(),
   State = #state{head_pid=HeadPid, head_ref=Ref, tcp_options=[]},
   find_pole(State),
   ok.
 
 init(HeadPid, Ref, TcpOptions) when erlang:is_list(TcpOptions)->
+  init_elements(),
   State = #state{head_pid=HeadPid, head_ref=Ref, tcp_options=TcpOptions},
   find_pole(State),
   ok.
+
+init_elements() ->
+  sin_system_load:start().    
 
 find_pole(State) ->
   tcp_connect(State).
@@ -72,7 +77,6 @@ loop(State) ->
 
 tcp_recv({get_system_load, ReqRef}, State) ->
   io:format("[get_system_load] Master asked for system load update.~n"),
-  sin_system_load:start(),
   SystemLoad = sin_system_load:get_system_load(),
   io:format("[get_system_load] System load: ~p~n", [SystemLoad]),
   SendResult = gen_tcp:send(State#state.socket, erlang:term_to_binary({system_load, ReqRef, SystemLoad})),
