@@ -1,6 +1,6 @@
 -module(sin_agent).
 
--define(INTERVAL, 1000).
+-define(INTERVAL, 30000).
 
 -behaviour(gen_server).
 -export([init/1]).
