@@ -9,6 +9,8 @@
 
 -export([spawn/0, spawn/1]).
 
+-export([get_system_load/1]).
+
 -include("./sin_system_load.hrl").
 
 -record(state,{
@@ -124,3 +126,8 @@ tcp_recv({system_load, ReqRef, SystemLoad}, State=#state{system_load_update_ref=
 tcp_recv(Msg, State) ->
   io:format("[~p:~p/~p] ~p~n", [?MODULE, ?FUNCTION_NAME, ?FUNCTION_ARITY, Msg]),
   {noreply, State}.
+
+% --- API
+
+get_system_load(AgentPid) ->
+  gen_server:call(AgentPid, {get_system_load}).

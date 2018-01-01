@@ -16,15 +16,15 @@ start() ->
     spawn(fun () -> loop_start() end).
 
 loop_start() ->
-    loop(#state{}).
+    loop(#state{task_sims=[],task_queue=[]}).
 
-loop(State) ->
-    NewState = loop_actions(State),
+loop(State1) ->
+    State2 = loop_actions(State1),
     receive
-        Any -> recv(Any, NewState)
+        Any -> recv(Any, State2)
     after 
         0 ->
-            loop(NewState)
+            loop(State2)
     end.
 
 -spec loop_actions(state()) -> state().
@@ -46,6 +46,10 @@ assign_task(State) ->
 
 -spec assign_task_2(any(), any(), state()) -> state().
 assign_task_2(TaskResponse, _BestSlave={ok, Agent}, State) ->
+    io:format("[~p:~p] Agent: ~p~n",[?MODULE, ?FUNCTION_NAME, Agent]),
+    State;
+assign_task_2(TaskResponse, {fail, no_agent}, State) ->
+    io:format("[~p:~p] no_agent~n",[?MODULE, ?FUNCTION_NAME]),
     State.
 
 -spec recv(tuple(), #state{}) -> any().

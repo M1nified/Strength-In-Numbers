@@ -12,6 +12,8 @@
   open/1
 ]).
 
+-include("./sin_system_load.hrl").
+
 -record(state,{
   pid :: pid(),
   ref :: reference(),
@@ -90,8 +92,13 @@ handle_call({add_task, Module, Function, Args}, _From, State) ->
       {reply, {error, timeout}, State}
   end;
 
+handle_call({get_best_slave}, _From, State=#state{agents=[_|_]}) ->
+  Loads = lists:map(fun ({Ref, {Pid, _}}) -> #sin_system_load{cpu_avg_1=Load} = sin_agent:get_system_load(Pid), {Ref, Load} end, State#state.agents),
+  io:format("[~p:~p][get_best_slave] Loads: ~p~n",[?MODULE, ?FUNCTION_NAME, Loads]),
+  [{Best, _} | _Rest] = lists:sort(fun ({_ARef, ALoad},{_BRef, BLoad}) -> ALoad =< BLoad end, Loads),
+  {reply, {ok, Best}, State};
 handle_call({get_best_slave}, _From, State) ->
-  {reply, not_implemented, State};
+  {reply, {fail, no_agent}, State};
 
 handle_call(Request, _From, State) ->
   io:format("handle_call: ~p~n", [Request]),
