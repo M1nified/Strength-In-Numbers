@@ -40,7 +40,9 @@ assign_task(State=#state{task_queue=[Task]}) ->
     assign_task_2(Task, Response, State#state{task_queue=[]});
 assign_task(State=#state{task_queue=[Task|Queue]}) ->
     Response = gen_server:call(State#state.labor_office, {get_best_slave}),
-    assign_task_2(Task, Response, State#state{task_queue=Queue}).
+    assign_task_2(Task, Response, State#state{task_queue=Queue});
+assign_task(State) ->
+    State.
 
 -spec assign_task_2(any(), any(), state()) -> state().
 assign_task_2(TaskResponse, _BestSlave={ok, Agent}, State) ->
