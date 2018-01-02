@@ -60,7 +60,7 @@ recv({labor_office, LaborOffice, LaborOfficeRef}, State) ->
 recv({add_task, Module, Function, Args, From, RequestRef}, State) ->
     Task = #sin_task{
         spawn_3={Module, Function, Args},
-        dependencies=sin_dep:needs(Module)
+        dependencies=sin_dep:fun_needs_modules(Module, Function, Args)
     },
     TaskSim = sin_master_task_sim:start(Task),
     From ! {task_sim, RequestRef, TaskSim},
