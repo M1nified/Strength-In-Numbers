@@ -8,7 +8,8 @@
   socket :: gen_tcp:socket(),
   head_pid :: pid(),
   head_ref :: reference(),
-  tcp_options :: [{atom(), any()}]
+  tcp_options :: [{atom(), any()}],
+  module_orders :: [{reference(), [module()]}]
 }).
 
 init(HeadPid, Ref) ->
@@ -83,8 +84,10 @@ tcp_recv({get_system_load, ReqRef}, State) ->
   io:format("[get_system_load] SendResult: ~p~n", [SendResult]),
   loop(State);
 
-tcp_recv({run_task, Task}, State) ->
-  loop(State);
+tcp_recv({run_task, Task}, State=#state{head_pid=HeadPid, head_ref=HeadRef}) ->
+  io:format("[~p:~p][run_task]~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, Task]),
+  gen_server:cast(HeadPid, {sin_slave_leash, HeadRef, {run_task, Task}}),
+  loop(State);  
 
 tcp_recv({update_modules, Modules}, State) when erlang:is_list(Modules) ->
   loop(State);
@@ -96,3 +99,5 @@ tcp_recv(Msg, State) ->
 send_to_master(State, Msg) ->
   gen_tcp:send(State#state.socket, erlang:term_to_binary(Msg)),
   loop(State).
+
+% ---

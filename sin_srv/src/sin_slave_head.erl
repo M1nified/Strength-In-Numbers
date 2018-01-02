@@ -21,7 +21,7 @@
 % gen_server
 
 init(_Args) ->
-  {ok, #state{}}.
+  {ok, #state{running_tasks=[],tasks_w8ing_4_modules=[]}}.
 
 handle_cast({find_master}, State) ->
   Ref = erlang:make_ref(),
@@ -29,21 +29,22 @@ handle_cast({find_master}, State) ->
   {noreply, State#state{leash_pid=Pid,leash_ref=Ref}};
 
 handle_cast({sin_slave_leash, LeashRef, MessageFromLeash}, State) ->
+  io:format("[~p:~p][sin_slave_leash]~n    LeashRef: ~p~n    Message: ~p~n", [?MODULE, ?FUNCTION_NAME, LeashRef, MessageFromLeash]),
   case State#state.leash_ref of
     LeashRef -> leash_cast(MessageFromLeash, State);
     _ -> {noreply, State}
   end;
 
 handle_cast(Request, State) ->
-  io:format("~p:~p: ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
+  io:format("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_call(Request, _From, State) ->
-  io:format("~p:~p: ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
+  io:format("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_info(OtherInfo, State) ->
-  io:format("~p:~p ~p~n",[?MODULE,?FUNCTION_NAME,OtherInfo]),
+  io:format("[~p:~p] ~p~n",[?MODULE,?FUNCTION_NAME,OtherInfo]),
   {noreply, State}.
   
 terminate(_Reason, _Tab) -> ok.
@@ -67,19 +68,36 @@ find_master(SlaveHead) ->
 
 % ---
 
-leash_cast({run_task, Task}, State) when erlang:is_list(Task) ->
-  case sin_dep:filter_loaded(Task#sin_task.dependencies) of
+leash_cast({run_task, Task}, State) ->
+  io:format("[~p:~p][run_task]~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, Task]),
+  case list_missing_modules(Task) of
     [] -> 
+      io:format("[~p:~p][run_task] Got all modules. ~n", [?MODULE, ?FUNCTION_NAME]),
       RunningTasks = State#state.running_tasks ++ [run_task(Task)],
       {noreply, State#state{running_tasks=RunningTasks}};
     Modules ->
-      State#state.leash_pid ! {send_to_master, {i_need_modules, Modules}},
+      io:format("[~p:~p][run_task] Requires additional modules:~n    ~p~n", [?MODULE, ?FUNCTION_NAME, Modules]),
+      State#state.leash_pid ! {send_to_master, {get_modules, Modules}},
       TasksW8 = State#state.tasks_w8ing_4_modules ++ [Task],
-      {noreply, State#state{tasks_w8ing_4_modules = TasksW8}}
+      {noreply, State#state{tasks_w8ing_4_modules=TasksW8}}
   end;
 
 leash_cast(_Msg, State) ->
   {noreply, State}.
 
-run_task(Task) ->
-  #sin_running_task{}.
+run_task(Task=#sin_task{spawn_3=Spawn3}) ->
+  io:format("[~p:~p]~n", [?MODULE, ?FUNCTION_NAME]),
+  Pid = erlang:apply(erlang, spawn, Spawn3),
+  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Pid]),
+  erlang:monitor(process, Pid),
+  #sin_running_task{pid=Pid,task=Task}.
+
+% ---
+
+list_missing_modules(_Task=#sin_task{dependencies=Deps}) ->
+  case code:ensure_modules_loaded(Deps) of
+    ok -> 
+      [];
+    {error, Modules} ->
+      Modules
+  end.

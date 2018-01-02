@@ -45,12 +45,13 @@ assign_task(State) ->
     State.
 
 -spec assign_task_2(any(), any(), state()) -> state().
-assign_task_2(TaskResponse, _BestSlave={ok, Agent}, State) ->
-    io:format("[~p:~p] Agent: ~p~n",[?MODULE, ?FUNCTION_NAME, Agent]),
+assign_task_2(Task, _BestSlave={ok, AgentRef}, State=#state{labor_office=LOPid}) ->
+    io:format("[~p:~p] AgentRef: ~p~n",[?MODULE, ?FUNCTION_NAME, AgentRef]),
+    sin_labor_office:assign_task(LOPid, AgentRef, Task),
     State;
-assign_task_2(TaskResponse, {fail, no_agent}, State) ->
+assign_task_2(Task, {fail, no_agent}, State=#state{task_queue=TaskQueue}) ->
     io:format("[~p:~p] no_agent~n",[?MODULE, ?FUNCTION_NAME]),
-    State.
+    State#state{task_queue=TaskQueue ++ [Task]}.
 
 -spec recv(tuple(), #state{}) -> any().
 recv({labor_office, LaborOffice, LaborOfficeRef}, State) ->

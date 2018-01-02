@@ -9,19 +9,19 @@
 -export([handle_accept/1]).
 
 -export([
-  open/1
+  open/1,
+  assign_task/3
 ]).
 
+-include("./sin_agent.hrl").
 -include("./sin_system_load.hrl").
 
 -record(state,{
   pid :: pid(),
   ref :: reference(),
   hunter :: any(),
-  acceptors :: [{reference(), pid()}],
-  agents :: [{reference(),{
-    pid(), [{term(), any()}]
-  }}],
+  acceptors :: [{reference(), sin_agent()}],
+  agents :: [{reference(), sin_agent()}],
   scheduler :: pid()
 }).
 
@@ -47,13 +47,13 @@ handle_cast({tcp_listen}, State) ->
   
 handle_cast({tcp_accept, ListenSocket}, State)->
   io:format("~p ~p tcp_accept (1) ~n", [?MODULE, ?FUNCTION_NAME]),
-  case sin_agent:spawn() of
-    {ok, Pid} ->
+  case sin_agent:start() of
+    {ok, Agent=#sin_agent{pid=Pid}} ->
       io:format("~p ~p tcp_accept (2.1) ~n", [?MODULE, ?FUNCTION_NAME]),
       Ref = erlang:make_ref(),
       gen_server:cast(Pid, {tcp_accept, ListenSocket, self(), Ref}),
       {noreply, State#state{
-        acceptors = State#state.acceptors ++ [{Ref, Pid}]
+        acceptors = State#state.acceptors ++ [{Ref, Agent}]
       }};
     _ -> 
       io:format("~p ~p tcp_accept (2.2) ~n", [?MODULE, ?FUNCTION_NAME]),
@@ -64,9 +64,9 @@ handle_cast({tcp_accepted, Ref}, State) when erlang:is_reference(Ref) ->
   io:format("~p ~p tcp_accepted ~n", [?MODULE, ?FUNCTION_NAME]),
   case proplists:get_value(Ref, State#state.acceptors) of
     undefined -> {noreply, State};
-    Pid -> 
+    Agent ->  % sin_agent()
       Acceptors = lists:filter(fun ({Ref2, _}) -> Ref =/= Ref2 end, State#state.acceptors),
-      Agents = State#state.agents ++ [{Ref, {Pid, []}}],
+      Agents = State#state.agents ++ [{Ref, Agent}],
       {noreply, State#state{
         acceptors = Acceptors,
         agents = Agents
@@ -76,6 +76,16 @@ handle_cast({tcp_accepted, Ref}, State) when erlang:is_reference(Ref) ->
 handle_cast({info, show_state}, State) ->
   io:format("~p state is:~n~p~n",[?MODULE, State]),
   {noreply, State};
+
+handle_cast({assign_task, AgentRef, Task}, State) when erlang:is_reference(AgentRef) ->
+  io:format("[~p:~p][assign_task] ~n    Agent: ~p~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, AgentRef, Task]),
+  case proplists:get_value(AgentRef, State#state.agents) of
+    undefined ->
+      {noreply, State};
+    Agent ->
+      sin_agent:assign_task(Agent, Task),
+      {noreply, State}
+  end;
 
 handle_cast(Request, State) ->
   io:format("handle_cast: ~p~n", [Request]),
@@ -93,7 +103,7 @@ handle_call({add_task, Module, Function, Args}, _From, State) ->
   end;
 
 handle_call({get_best_slave}, _From, State=#state{agents=[_|_]}) ->
-  Loads = lists:map(fun ({Ref, {Pid, _}}) -> #sin_system_load{cpu_avg_1=Load} = sin_agent:get_system_load(Pid), {Ref, Load} end, State#state.agents),
+  Loads = lists:map(fun ({Ref, #sin_agent{pid=Pid}}) -> #sin_system_load{cpu_avg_1=Load} = sin_agent:get_system_load(Pid), {Ref, Load} end, State#state.agents),
   io:format("[~p:~p][get_best_slave] Loads: ~p~n",[?MODULE, ?FUNCTION_NAME, Loads]),
   [{Best, _} | _Rest] = lists:sort(fun ({_ARef, ALoad},{_BRef, BLoad}) -> ALoad =< BLoad end, Loads),
   {reply, {ok, Best}, State};
@@ -103,12 +113,6 @@ handle_call({get_best_slave}, _From, State) ->
 handle_call(Request, _From, State) ->
   io:format("handle_call: ~p~n", [Request]),
   {noreply, State}.
-
-handle_info({capture, HunterRef, {socket, Socket}}, State) ->
-  case sin_hunter:get_ref(State#state.hunter) of
-    HunterRef -> {noreply, add_agent(State, Socket)};
-    _ -> {noreply, State}
-  end;
 
 handle_info(OtherInfo, State) ->
   io:format("~p ~p ~p~n",[?MODULE,?FUNCTION_NAME,OtherInfo]),
@@ -124,7 +128,7 @@ code_change(_OldVersion, Tab, _Extra) -> {ok, Tab}.
 handle_accept(ListenSocket) ->
   [gen_server:cast(self(), {tcp_accept, ListenSocket}) || _ <- lists:seq(1,5)].
 
-% ---
+% --- API
 
 open(HunterConfig) ->
   case gen_server:start_link(?MODULE, HunterConfig, []) of
@@ -133,9 +137,5 @@ open(HunterConfig) ->
     ignore -> ignore
   end.
 
-% ---
-
-add_agent(State, Socket) ->
-  io:format("add_agent~n"),
-  sin_agent:spawn(Socket),
-  State.
+assign_task(LaborOfficePid, AgentRef, Task) when erlang:is_reference(AgentRef) ->
+  gen_server:cast(LaborOfficePid, {assign_task, AgentRef, Task}).

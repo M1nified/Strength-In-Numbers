@@ -1,14 +1,19 @@
+-type sin_spawn_3() :: {module(), atom(), [term()]}.
+
 -record(sin_task,{
-  spawn_3 :: {module(), atom(), [term()]},
+  spawn_3 :: sin_spawn_3(),
   dependencies :: [module()]
 }).
 -type sin_task() :: #sin_task{}.
 
 -record(sin_running_task,{
-  module :: module(),
-  function_name :: atom(),
-  arguments :: [term()],
   pid :: pid(),
-  sin_task :: sin_task()
+  task :: sin_task()
 }).
 -type sin_running_task() :: #sin_running_task{}.
+
+-record(sin_task_sim, {
+  pid :: pid(),
+  task :: sin_task()
+}).
+-type sin_task_sim() :: #sin_task_sim{}.

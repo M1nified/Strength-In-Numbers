@@ -8,9 +8,12 @@
 -export([terminate/2, code_change/3]).
 
 -export([spawn/0, spawn/1]).
+-export([start/0, start/1]).
 
+-export([assign_task/2]).
 -export([get_system_load/1]).
 
+-include("./sin_agent.hrl").
 -include("./sin_system_load.hrl").
 
 -record(state,{
@@ -70,6 +73,11 @@ handle_cast({update_system_load}, State=#state{system_load_update_ref=undefined}
 handle_cast({update_system_load}, State) ->
   {noreply, State};
 
+handle_cast({assign_task, _TaskSim={_TaskSimPid, Task}}, State) ->
+  io:format("[~p:~p][assign_task]~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, Task]),  
+  gen_tcp:send(State#state.socket, erlang:term_to_binary({run_task, Task})),
+  {noreply, State};
+
 handle_cast(Request, State) ->
   io:format("handle_cast: ~p~n", [Request]),
   {noreply, State}.
@@ -118,6 +126,20 @@ spawn(Socket) ->
     ignore -> ignore
   end.
 
+start() ->
+  case sin_agent:spawn() of
+    {ok, Pid} ->
+      {ok, #sin_agent{pid=Pid}};
+    _ -> error
+  end.
+
+start(Socket) ->
+case sin_agent:spawn(Socket) of
+  {ok, Pid} ->
+    {ok, #sin_agent{pid=Pid}};
+  _ -> error
+end.
+
 % ---
 
 tcp_recv({system_load, ReqRef, SystemLoad}, State=#state{system_load_update_ref=ReqRef}) ->
@@ -129,5 +151,10 @@ tcp_recv(Msg, State) ->
 
 % --- API
 
-get_system_load(AgentPid) ->
-  gen_server:call(AgentPid, {get_system_load}).
+get_system_load(AgentPid) when erlang:is_pid(AgentPid) ->
+  gen_server:call(AgentPid, {get_system_load});
+get_system_load(_Agent=#sin_agent{pid=Pid}) ->
+  get_system_load(Pid).
+
+assign_task(_Agent=#sin_agent{pid=Pid}, Task) ->
+  gen_server:cast(Pid, {assign_task, Task}).
