@@ -85,9 +85,9 @@ leash_cast({run_task, Task}, State) ->
 leash_cast(_Msg, State) ->
   {noreply, State}.
 
-run_task(Task=#sin_task{spawn_3=Spawn3}) ->
+run_task(Task=#sin_task{spawn_3={Module, Function, Args}}) ->
   io:format("[~p:~p]~n", [?MODULE, ?FUNCTION_NAME]),
-  Pid = erlang:apply(erlang, spawn, Spawn3),
+  Pid = erlang:apply(erlang, spawn, [Module, Function, Args]),
   io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Pid]),
   erlang:monitor(process, Pid),
   #sin_running_task{pid=Pid,task=Task}.
