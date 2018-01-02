@@ -8,6 +8,7 @@
 
 -record(sin_running_task,{
   pid :: pid(),
+  execution_ref :: reference(),
   task :: sin_task()
 }).
 -type sin_running_task() :: #sin_running_task{}.

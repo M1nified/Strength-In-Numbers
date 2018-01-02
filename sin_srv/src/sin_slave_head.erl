@@ -35,6 +35,27 @@ handle_cast({sin_slave_leash, LeashRef, MessageFromLeash}, State) ->
     _ -> {noreply, State}
   end;
 
+handle_cast({execution, ExecutionRef, finished, ExecutionResult}, State) ->
+  io:format("[~p:~p][execution][finished] Ref: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionRef]),
+  io:format("[~p:~p][execution][finished] Result: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionResult]),
+  case pop_from_running_tasks_by_ref(ExecutionRef, State) of
+    {undefined, State2} ->
+      {noreply, State2};
+    {RunningTask, State2} ->
+      State2#state.leash_pid ! {send_to_master, {task_exec, finished, RunningTask#sin_running_task.task, ExecutionResult}},
+      {noreply, State2}
+  end;
+
+handle_cast({execution, ExecutionRef, failed}, State) ->
+  io:format("[~p:~p][execution][failed] Ref: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionRef]),
+  case pop_from_running_tasks_by_ref(ExecutionRef, State) of
+    {undefined, State2} ->
+      {noreply, State2};
+    {RunningTask, State2} ->
+      State2#state.leash_pid ! {send_to_master, {task_exec, failed, RunningTask#sin_running_task.task}},
+      {noreply, State2}
+  end;
+
 handle_cast(Request, State) ->
   io:format("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
@@ -85,12 +106,21 @@ leash_cast({run_task, Task}, State) ->
 leash_cast(_Msg, State) ->
   {noreply, State}.
 
-run_task(Task=#sin_task{spawn_3={Module, Function, Args}}) ->
-  io:format("[~p:~p]~n", [?MODULE, ?FUNCTION_NAME]),
-  Pid = erlang:apply(erlang, spawn, [Module, Function, Args]),
-  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Pid]),
-  erlang:monitor(process, Pid),
-  #sin_running_task{pid=Pid,task=Task}.
+run_task(Task) ->
+  {ok, ExecutionRef, Pid} = sin_slave_executor:execute(self(), Task),
+  #sin_running_task{pid=Pid,task=Task,execution_ref=ExecutionRef}.
+
+pop_from_running_tasks_by_ref(ExecutionRef, State=#state{running_tasks=RunningTasks}) ->
+  io:format("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, RunningTasks]),
+  case lists:filter(fun (#sin_running_task{execution_ref=Ref}) -> Ref == ExecutionRef end, RunningTasks) of
+    [RTask | _] ->
+      io:format("A~n"),
+      RTasks = lists:delete(RTask, RunningTasks),
+      {RTask, State#state{running_tasks=RTasks}};
+    _ ->
+      io:format("B~n"),
+      {undefined, State}
+  end.
 
 % ---
 

@@ -145,6 +145,12 @@ end.
 tcp_recv({system_load, ReqRef, SystemLoad}, State=#state{system_load_update_ref=ReqRef}) ->
   {noreply, State#state{system_load=SystemLoad, system_load_update_ref=undefined}};
 
+tcp_recv({task_exec, finished, Task, ExecutionResult}, State) ->
+  {noreply, State};
+
+tcp_recv({task_exec, failed, Task}, State) ->
+  {noreply, State};
+
 tcp_recv(Msg, State) ->
   io:format("[~p:~p/~p] ~p~n", [?MODULE, ?FUNCTION_NAME, ?FUNCTION_ARITY, Msg]),
   {noreply, State}.
