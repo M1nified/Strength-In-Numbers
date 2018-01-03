@@ -22,9 +22,11 @@ loop_start() ->
 loop(State1) ->
     State2 = loop_actions(State1),
     receive
-        Any -> recv(Any, State2)
+        Any -> 
+            io:format("[~p:~p] Received Any: ~p~n",[?MODULE,?FUNCTION_NAME,Any]),
+            recv(Any, State2)
     after 
-        0 ->
+        1 ->
             loop(State2)
     end.
 
@@ -49,6 +51,9 @@ assign_task_2({_,Task}, _BestSlave={ok, AgentRef}, State=#state{labor_office=LOP
     State#state{no_agent_counter=0};
 assign_task_2(Task, {fail, no_agent}, State=#state{task_queue=TaskQueue,no_agent_counter=NACounter}) ->
     case NACounter rem 100000 of 0 -> io:format("[~p:~p] no_agent~n",[?MODULE, ?FUNCTION_NAME]); _ -> ok end,
+    State#state{task_queue=TaskQueue ++ [Task], no_agent_counter=NACounter+1};
+assign_task_2(Task, {fail, no_free_agent}, State=#state{task_queue=TaskQueue,no_agent_counter=NACounter}) ->
+    case NACounter rem 100 of 0 -> io:format("[~p:~p] no_free_agent~n",[?MODULE, ?FUNCTION_NAME]); _ -> ok end,
     State#state{task_queue=TaskQueue ++ [Task], no_agent_counter=NACounter+1}.
 
 -spec recv(tuple(), state()) -> any().
@@ -60,6 +65,7 @@ recv({task_sim, Task, task_msg, Msg}, State=#state{labor_office=LaborOffice}) ->
     loop(State);
 
 recv({add_task, Module, Function, Args, From, RequestRef}, State) ->
+    io:format("[~p:~p][add_task] ~p:~p~p~n",[?MODULE,?FUNCTION_NAME,Module,Function,Args]),
     Task = #sin_task{
         ref=erlang:make_ref(),
         spawn_3={Module, Function, Args},
@@ -74,5 +80,5 @@ recv({add_task, Module, Function, Args, From, RequestRef}, State) ->
     loop(State2);
 
 recv(Request, State) ->
-    io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
+    io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
     loop(State).

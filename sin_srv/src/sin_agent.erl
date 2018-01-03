@@ -39,12 +39,15 @@ init(Socket) ->
   {ok, init_state(#state{socket=Socket})}.
 
 init_loops() ->
-  erlang:start_timer(0, self(), update_system_load, [{abs, false}]).
+  ok.
 
 init_state(State) ->
   State#state{
     system_load=#sin_system_load{cpu_avg_1=256, cpu_avg_5=256, cpu_avg_15=256}
   }.
+
+init_remote_status_checkers() ->
+  erlang:start_timer(0, self(), update_system_load, [{abs, false}]).
   
 handle_cast({tcp_accept, ListenSocket, From, Ref}, State) ->
   io:format("~p ~p tcp_accept (1) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
@@ -52,6 +55,7 @@ handle_cast({tcp_accept, ListenSocket, From, Ref}, State) ->
   case gen_tcp:accept(ListenSocket) of
     {ok, Socket} ->
       io:format("~p ~p tcp_accept (2.1) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
+      init_remote_status_checkers(),
       gen_server:cast(From, {tcp_accepted, Ref}),
       gen_server:cast(From, {tcp_accept, ListenSocket}), % will keep the same amount of acceptors all the time
       {noreply, State2#state{socket=Socket, ref=Ref}};

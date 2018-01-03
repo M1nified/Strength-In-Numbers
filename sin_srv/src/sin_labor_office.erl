@@ -82,10 +82,10 @@ handle_cast({info, show_state}, State) ->
   io:format("~p state is:~n~p~n",[?MODULE, State]),
   {noreply, State};
 
-handle_cast({resend_messages_for_task, Task}, State=#state{pending_messages=PendingMessages}) ->
+handle_cast({resend_messages_for_task, Task=#sin_task{ref=TaskRef}}, State=#state{pending_messages=PendingMessages}) ->
   io:format("[~p:~p][resend_messages_for_task]~n", [?MODULE, ?FUNCTION_NAME]),
   io:format("[~p:~p][resend_messages_for_task] All PendingMessages: ~p~n", [?MODULE, ?FUNCTION_NAME, PendingMessages]),
-  Queue = lists:filtermap(fun ({T,Msg}) -> {T==Task, Msg} end,PendingMessages),
+  Queue = lists:filtermap(fun ({#sin_task{ref=Ref},Msg}) -> case Ref==TaskRef of true -> {true, Msg}; _ -> false end end, PendingMessages),
   io:format("[~p:~p][resend_messages_for_task] Queue: ~p~n", [?MODULE, ?FUNCTION_NAME, Queue]),
   lists:foreach(fun (Msg) -> gen_server:cast(self(), {message_to_task, Task, Msg}) end, Queue),
   PendingMessages2 = lists:filter(fun ({T, _}) -> T /= Task end, PendingMessages),
@@ -117,9 +117,10 @@ handle_cast(Request, State) ->
   {noreply, State}.
 
 handle_call({add_task, Module, Function, Args}, _From, State) ->
-  io:format("[~p:~p][add_task] ~p ~p~n",[?MODULE, ?FUNCTION_NAME, Module, Function]),
+  io:format("[~p:~p][add_task] ~p:~p~p~n",[?MODULE, ?FUNCTION_NAME, Module, Function,Args]),
   Ref = erlang:make_ref(),
   State#state.scheduler ! {add_task, Module, Function, Args, self(), Ref},
+  io:format("[~p:~p][add_task] ~p:~p~p SENT TO SCHEDULER!!!~n",[?MODULE, ?FUNCTION_NAME, Module, Function,Args]),  
   receive
     {task_sim, Ref, TaskSimPid} ->
       {reply, {ok, TaskSimPid}, State}
@@ -130,9 +131,13 @@ handle_call({add_task, Module, Function, Args}, _From, State) ->
 
 handle_call({get_best_slave}, _From, State=#state{agents=[_|_]}) ->
   Loads = lists:map(fun ({Ref, #sin_agent{pid=Pid}}) -> #sin_system_load{cpu_avg_1=Load} = sin_agent:get_system_load(Pid), {Ref, Load} end, State#state.agents),
-  io:format("[~p:~p][get_best_slave] Loads: ~p~n",[?MODULE, ?FUNCTION_NAME, Loads]),
-  [{Best, _} | _Rest] = lists:sort(fun ({_ARef, ALoad},{_BRef, BLoad}) -> ALoad =< BLoad end, Loads),
-  {reply, {ok, Best}, State};
+  [{Best, BestLoad} | _Rest] = lists:sort(fun ({_ARef, ALoad},{_BRef, BLoad}) -> ALoad =< BLoad end, Loads),
+  case BestLoad > 200 of
+    true ->
+      {reply, {fail, no_free_agent}, State};
+    _ ->
+      {reply, {ok, Best}, State}
+  end;
 handle_call({get_best_slave}, _From, State) ->
   {reply, {fail, no_agent}, State};
 
