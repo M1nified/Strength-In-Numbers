@@ -15,6 +15,7 @@
 
 -include("./sin_agent.hrl").
 -include("./sin_system_load.hrl").
+-include("./sin_task.hrl").
 
 -record(state,{
   pid :: pid(),
@@ -22,7 +23,9 @@
   hunter :: any(),
   acceptors :: [{reference(), sin_agent()}],
   agents :: [{reference(), sin_agent()}],
-  scheduler :: pid()
+  scheduler :: pid(),
+  assigned_tasks :: [{sin_task(), sin_agent()}],
+  pending_messages :: [{sin_task(), any()}]
 }).
 
 % ---
@@ -37,7 +40,9 @@ init(HunterConfig) ->
     hunter=Hunter, 
     acceptors=[],
     agents=[],
-    scheduler=Scheduler
+    scheduler=Scheduler,
+    assigned_tasks=[],
+    pending_messages=[]
   }}.
 
 handle_cast({tcp_listen}, State) ->
@@ -77,6 +82,23 @@ handle_cast({info, show_state}, State) ->
   io:format("~p state is:~n~p~n",[?MODULE, State]),
   {noreply, State};
 
+handle_cast({resend_messages_for_task, Task}, State=#state{pending_messages=PendingMessages}) ->
+  Queue = lists:filtermap(fun ({T,Msg}) -> {T==Task, Msg} end,PendingMessages),
+  lists:foreach(fun (Msg) -> gen_server:cast(self(), Msg) end, Queue),
+  PendingMessages2 = lists:filter(fun ({T, _}) -> T /= Task end, PendingMessages),
+  {noreply, State#state{pending_messages=PendingMessages2}};
+
+handle_cast(Request={message_to_task, Task=#sin_task{ref=Ref}, Message}, State=#state{assigned_tasks=AssignedTasks}) ->
+  io:format("[~p:~p][message_to_task]~n    Task: ~p~n    Message: ~p~n", [?MODULE, ?FUNCTION_NAME, Task, Message]),
+  io:format("[~p:~p][message_to_task]~n    AssignedTasks: ~p~n", [?MODULE, ?FUNCTION_NAME, AssignedTasks]),
+  case lists:filter(fun ({#sin_task{ref=R}, _}) -> R == Ref end, AssignedTasks) of
+    [] ->
+      {noreply, State#state{pending_messages=State#state.pending_messages++[{Task, Message}]}};
+    [{_,Agent}|_] -> 
+      sin_agent:cast(Agent, Request),
+      {noreply, State}
+  end;
+
 handle_cast({assign_task, AgentRef, Task}, State) when erlang:is_reference(AgentRef) ->
   io:format("[~p:~p][assign_task] ~n    Agent: ~p~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, AgentRef, Task]),
   case proplists:get_value(AgentRef, State#state.agents) of
@@ -84,7 +106,7 @@ handle_cast({assign_task, AgentRef, Task}, State) when erlang:is_reference(Agent
       {noreply, State};
     Agent ->
       sin_agent:assign_task(Agent, Task),
-      {noreply, State}
+      {noreply, State#state{assigned_tasks=State#state.assigned_tasks++[{Task, Agent}]}}
   end;
 
 handle_cast(Request, State) ->
@@ -92,6 +114,7 @@ handle_cast(Request, State) ->
   {noreply, State}.
 
 handle_call({add_task, Module, Function, Args}, _From, State) ->
+  io:format("[~p:~p][add_task] ~p ~p~n",[?MODULE, ?FUNCTION_NAME, Module, Function]),
   Ref = erlang:make_ref(),
   State#state.scheduler ! {add_task, Module, Function, Args, self(), Ref},
   receive

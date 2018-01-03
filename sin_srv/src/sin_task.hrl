@@ -1,6 +1,7 @@
 -type sin_spawn_3() :: {module(), atom(), [term()]}.
 
 -record(sin_task,{
+  ref :: reference(),
   spawn_3 :: sin_spawn_3(),
   dependencies :: [module()]
 }).

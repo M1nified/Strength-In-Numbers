@@ -35,9 +35,6 @@ loop_actions(State) ->
 -spec assign_task(state()) -> state().
 assign_task(State=#state{task_queue=[]}) ->
     State;
-assign_task(State=#state{task_queue=[Task]}) ->
-    Response = gen_server:call(State#state.labor_office, {get_best_slave}),
-    assign_task_2(Task, Response, State#state{task_queue=[]});
 assign_task(State=#state{task_queue=[Task|Queue]}) ->
     Response = gen_server:call(State#state.labor_office, {get_best_slave}),
     assign_task_2(Task, Response, State#state{task_queue=Queue});
@@ -45,7 +42,7 @@ assign_task(State) ->
     State.
 
 -spec assign_task_2(any(), any(), state()) -> state().
-assign_task_2(Task, _BestSlave={ok, AgentRef}, State=#state{labor_office=LOPid}) ->
+assign_task_2({_,Task}, _BestSlave={ok, AgentRef}, State=#state{labor_office=LOPid}) ->
     io:format("[~p:~p] AgentRef: ~p~n",[?MODULE, ?FUNCTION_NAME, AgentRef]),
     sin_labor_office:assign_task(LOPid, AgentRef, Task),
     State;
@@ -53,16 +50,21 @@ assign_task_2(Task, {fail, no_agent}, State=#state{task_queue=TaskQueue}) ->
     io:format("[~p:~p] no_agent~n",[?MODULE, ?FUNCTION_NAME]),
     State#state{task_queue=TaskQueue ++ [Task]}.
 
--spec recv(tuple(), #state{}) -> any().
+-spec recv(tuple(), state()) -> any().
 recv({labor_office, LaborOffice, LaborOfficeRef}, State) ->
     loop(State#state{labor_office=LaborOffice, labor_office_ref=LaborOfficeRef});
 
+recv({task_sim, Task, task_msg, Msg}, State=#state{labor_office=LaborOffice}) ->
+    gen_server:cast(LaborOffice, {message_to_task, Task, Msg}),
+    loop(State);
+
 recv({add_task, Module, Function, Args, From, RequestRef}, State) ->
     Task = #sin_task{
+        ref=erlang:make_ref(),
         spawn_3={Module, Function, Args},
         dependencies=sin_dep:fun_needs_modules(Module, Function, Args)
     },
-    TaskSim = sin_master_task_sim:start(Task),
+    TaskSim = sin_master_task_sim:start(Task, self()),
     From ! {task_sim, RequestRef, TaskSim},
     State2 = State#state{
         task_sims=State#state.task_sims ++ [{TaskSim, Task}],

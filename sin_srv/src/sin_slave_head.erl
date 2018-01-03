@@ -21,6 +21,7 @@
 % gen_server
 
 init(_Args) ->
+  % sin_proc:add_client(self()),
   {ok, #state{running_tasks=[],tasks_w8ing_4_modules=[]}}.
 
 handle_cast({find_master}, State) ->
@@ -33,6 +34,16 @@ handle_cast({sin_slave_leash, LeashRef, MessageFromLeash}, State) ->
   case State#state.leash_ref of
     LeashRef -> leash_cast(MessageFromLeash, State);
     _ -> {noreply, State}
+  end;
+
+handle_cast({execution, ExecutionRef, started}, State=#state{running_tasks=RunningTasks}) ->
+  io:format("[~p:~p][execution][started] Ref: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionRef]),
+  case lists:filter(fun (#sin_running_task{execution_ref=Ref}) -> Ref == ExecutionRef end, RunningTasks) of
+    [] ->
+      {noreply, State};
+    [#sin_running_task{task=Task}|_] ->
+      State#state.leash_pid ! {send_to_master, {task_exec, started, Task}},
+      {noreply, State}
   end;
 
 handle_cast({execution, ExecutionRef, finished, ExecutionResult}, State) ->
@@ -63,6 +74,10 @@ handle_cast(Request, State) ->
 handle_call(Request, _From, State) ->
   io:format("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
+
+handle_info({sin_proc, captured_message, to_master, MasterProc, Msg}, State) ->
+  State#state.leash_pid ! {send_to_master, {message_to_proc, MasterProc, Msg}},
+  {noreply, State};
 
 handle_info(OtherInfo, State) ->
   io:format("[~p:~p] ~p~n",[?MODULE,?FUNCTION_NAME,OtherInfo]),
@@ -101,6 +116,16 @@ leash_cast({run_task, Task}, State) ->
       State#state.leash_pid ! {send_to_master, {get_modules, Modules}},
       TasksW8 = State#state.tasks_w8ing_4_modules ++ [Task],
       {noreply, State#state{tasks_w8ing_4_modules=TasksW8}}
+  end;
+
+leash_cast({message_to_task, Task, Msg}, State=#state{running_tasks=RunningTasks}) ->
+  io:format("[~p:~p][message_to_task]~n    Msg: ~p~n", [?MODULE, ?FUNCTION_NAME, Msg]),
+  case lists:filter(fun (#sin_running_task{task=#sin_task{ref=TaskRef}}) -> TaskRef == Task#sin_task.ref end, RunningTasks) of
+    [RTask|_] ->
+      RTask#sin_running_task.pid ! {message_to_task, Msg},
+      {noreply, State};
+    _ ->
+      {noreply, State}
   end;
 
 leash_cast(_Msg, State) ->

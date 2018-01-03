@@ -84,6 +84,11 @@ tcp_recv({get_system_load, ReqRef}, State) ->
   io:format("[get_system_load] SendResult: ~p~n", [SendResult]),
   loop(State);
 
+tcp_recv(Req={message_to_task, _Task, Msg}, State=#state{head_pid=HeadPid, head_ref=HeadRef}) ->
+  io:format("[~p:~p][message_to_task]~n    Msg: ~p~n", [?MODULE, ?FUNCTION_NAME, Msg]),
+  gen_server:cast(HeadPid, {sin_slave_leash, HeadRef, Req}),
+  loop(State);
+
 tcp_recv({run_task, Task}, State=#state{head_pid=HeadPid, head_ref=HeadRef}) ->
   io:format("[~p:~p][run_task]~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, Task]),
   gen_server:cast(HeadPid, {sin_slave_leash, HeadRef, {run_task, Task}}),

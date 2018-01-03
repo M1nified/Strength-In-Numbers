@@ -1,24 +1,24 @@
 -module(sin_master_task_sim).
 
--export([start/1]).
+-export([start/2]).
 
 -record(state, {
-    task :: term()
+    task :: term(),
+    scheduler :: pid()
 }).
 
-start(Task) ->
-    spawn(fun () -> loop_start(Task) end).
+start(Task, Scheduler) ->
+    spawn(fun () -> loop_start(Task, Scheduler) end).
 
-loop_start(Task) ->
+loop_start(Task, Scheduler) ->
     loop(#state{
-        task=Task
+        task=Task,
+        scheduler=Scheduler
     }).
 
-loop(State) ->
+loop(State=#state{task=Task, scheduler=Scheduler}) ->
     receive
-        _ -> loop(State)
-            
-    after
-        100 -> loop(State)
-            
+        Msg -> 
+            Scheduler ! {task_sim, Task, task_msg, Msg},
+            loop(State)
     end.

@@ -12,6 +12,7 @@
 
 -export([assign_task/2]).
 -export([get_system_load/1]).
+-export([cast/2]).
 
 -include("./sin_agent.hrl").
 -include("./sin_system_load.hrl").
@@ -20,7 +21,8 @@
   socket :: gen_tcp:socket(),
   ref :: reference(),
   system_load :: sin_system_load(),
-  system_load_update_ref :: reference()
+  system_load_update_ref :: reference(),
+  labor_office :: pid()
 }).
 
 init(Args) when erlang:is_list(Args) ->      
@@ -46,15 +48,16 @@ init_state(State) ->
   
 handle_cast({tcp_accept, ListenSocket, From, Ref}, State) ->
   io:format("~p ~p tcp_accept (1) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
+  State2 = State#state{labor_office=From},
   case gen_tcp:accept(ListenSocket) of
     {ok, Socket} ->
       io:format("~p ~p tcp_accept (2.1) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
       gen_server:cast(From, {tcp_accepted, Ref}),
       gen_server:cast(From, {tcp_accept, ListenSocket}), % will keep the same amount of acceptors all the time
-      {noreply, State#state{socket=Socket, ref=Ref}};
+      {noreply, State2#state{socket=Socket, ref=Ref}};
     _ -> 
       io:format("~p ~p tcp_accept (2.2) ~p~n",[?MODULE,?FUNCTION_NAME, Ref]),
-      {noreply, State}
+      {noreply, State2}
   end;
 
 handle_cast({update_system_load}, State=#state{system_load_update_ref=undefined}) ->
@@ -73,7 +76,12 @@ handle_cast({update_system_load}, State=#state{system_load_update_ref=undefined}
 handle_cast({update_system_load}, State) ->
   {noreply, State};
 
-handle_cast({assign_task, _TaskSim={_TaskSimPid, Task}}, State) ->
+handle_cast({message_to_task, Task, Msg}, State) ->
+  io:format("[~p:~p][message_to_task]~n    Msg: ~p~n", [?MODULE, ?FUNCTION_NAME, Msg]),  
+  gen_tcp:send(State#state.socket, erlang:term_to_binary({message_to_task, Task, Msg})),
+  {noreply, State};
+
+handle_cast({assign_task, Task}, State) ->
   io:format("[~p:~p][assign_task]~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, Task]),  
   gen_tcp:send(State#state.socket, erlang:term_to_binary({run_task, Task})),
   {noreply, State};
@@ -145,6 +153,10 @@ end.
 tcp_recv({system_load, ReqRef, SystemLoad}, State=#state{system_load_update_ref=ReqRef}) ->
   {noreply, State#state{system_load=SystemLoad, system_load_update_ref=undefined}};
 
+tcp_recv({task_exec, started, Task}, State=#state{labor_office=Lo}) ->
+  gen_server:cast(Lo, {resend_messages_for_task, Task}),
+  {noreply, State};
+
 tcp_recv({task_exec, finished, Task, ExecutionResult}, State) ->
   {noreply, State};
 
@@ -164,3 +176,8 @@ get_system_load(_Agent=#sin_agent{pid=Pid}) ->
 
 assign_task(_Agent=#sin_agent{pid=Pid}, Task) ->
   gen_server:cast(Pid, {assign_task, Task}).
+
+cast(AgentPid, Message) when erlang:is_pid(AgentPid) ->
+  gen_server:cast(AgentPid, Message);
+cast(Agent=#sin_agent{pid=Pid}, Message) ->
+  cast(Pid, Message).

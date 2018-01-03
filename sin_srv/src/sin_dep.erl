@@ -65,7 +65,9 @@ fun_needs_modules(Module, FunctionName, FunctionArity) when erlang:is_number(Fun
   Funs = fun_needs(Module, FunctionName, FunctionArity),
   lists:usort([ Mod || {Mod, _, _} <- Funs]).
 
-fun_needs_single(Module, FunctionName, FunctionArity) ->
+fun_needs_single(Module, FunctionName, Arguments) when erlang:is_list(Arguments) ->
+  fun_needs_single(Module, FunctionName, list_count(Arguments));
+fun_needs_single(Module, FunctionName, FunctionArity) when erlang:is_number(FunctionArity)->
   case code:which(Module) of
     non_existing -> 
       non_existing;
@@ -80,9 +82,13 @@ fun_needs_single(Module, FunctionName, FunctionArity) ->
         BeamFile ->
           {_,_,_,_,_,Functions} = BeamFile,
           Funs = lists:filter(fun ({_,Name, Arity, _Entry, _Code}) -> (Name == FunctionName) and  (Arity == FunctionArity)  end, Functions),
-          [Fun | _] = Funs,
-          {_, _Name, _Arity, _Entry, Code} = Fun,
-          _ExternalCalls = lists:usort(lists:filtermap(fun filtermap_only_call_ext/1, Code))
+          case Funs of
+            [Fun | _] ->
+              {_, _Name, _Arity, _Entry, Code} = Fun,
+              _ExternalCalls = lists:usort(lists:filtermap(fun filtermap_only_call_ext/1, Code));
+            _ ->
+              []
+          end  
       end
   end.
 

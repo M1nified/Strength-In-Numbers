@@ -72,8 +72,11 @@ select_role_and_run(master) ->
     {ok, LaborOffice};
 select_role_and_run(slave) ->
     io:format("Starting slave server!~n"),
-    {ok, SlaveHead} = sin_slave_head:rise(),
-    sin_slave_head:find_master(SlaveHead),
-    {ok, SlaveHead};
+    case sin_slave_head:rise() of
+        {ok, SlaveHead} ->
+            sin_slave_head:find_master(SlaveHead),
+            {ok, SlaveHead};
+        _ -> error
+    end;
 select_role_and_run(_UnknownRole) ->
     {error, unknown_role}.
