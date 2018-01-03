@@ -8,7 +8,8 @@
     labor_office :: pid(),
     labor_office_ref :: reference(),
     task_sims :: [{pid(), #sin_task{}}],
-    task_queue :: [{pid(), #sin_task{}}]
+    task_queue :: [{pid(), #sin_task{}}],
+    no_agent_counter :: number()
 }).
 -type state() :: #state{}.
 
@@ -16,7 +17,7 @@ start() ->
     spawn(fun () -> loop_start() end).
 
 loop_start() ->
-    loop(#state{task_sims=[],task_queue=[]}).
+    loop(#state{task_sims=[],task_queue=[],no_agent_counter=0}).
 
 loop(State1) ->
     State2 = loop_actions(State1),
@@ -45,10 +46,10 @@ assign_task(State) ->
 assign_task_2({_,Task}, _BestSlave={ok, AgentRef}, State=#state{labor_office=LOPid}) ->
     io:format("[~p:~p] AgentRef: ~p~n",[?MODULE, ?FUNCTION_NAME, AgentRef]),
     sin_labor_office:assign_task(LOPid, AgentRef, Task),
-    State;
-assign_task_2(Task, {fail, no_agent}, State=#state{task_queue=TaskQueue}) ->
-    io:format("[~p:~p] no_agent~n",[?MODULE, ?FUNCTION_NAME]),
-    State#state{task_queue=TaskQueue ++ [Task]}.
+    State#state{no_agent_counter=0};
+assign_task_2(Task, {fail, no_agent}, State=#state{task_queue=TaskQueue,no_agent_counter=NACounter}) ->
+    case NACounter rem 100000 of 0 -> io:format("[~p:~p] no_agent~n",[?MODULE, ?FUNCTION_NAME]); _ -> ok end,
+    State#state{task_queue=TaskQueue ++ [Task], no_agent_counter=NACounter+1}.
 
 -spec recv(tuple(), state()) -> any().
 recv({labor_office, LaborOffice, LaborOfficeRef}, State) ->

@@ -83,8 +83,11 @@ handle_cast({info, show_state}, State) ->
   {noreply, State};
 
 handle_cast({resend_messages_for_task, Task}, State=#state{pending_messages=PendingMessages}) ->
+  io:format("[~p:~p][resend_messages_for_task]~n", [?MODULE, ?FUNCTION_NAME]),
+  io:format("[~p:~p][resend_messages_for_task] All PendingMessages: ~p~n", [?MODULE, ?FUNCTION_NAME, PendingMessages]),
   Queue = lists:filtermap(fun ({T,Msg}) -> {T==Task, Msg} end,PendingMessages),
-  lists:foreach(fun (Msg) -> gen_server:cast(self(), Msg) end, Queue),
+  io:format("[~p:~p][resend_messages_for_task] Queue: ~p~n", [?MODULE, ?FUNCTION_NAME, Queue]),
+  lists:foreach(fun (Msg) -> gen_server:cast(self(), {message_to_task, Task, Msg}) end, Queue),
   PendingMessages2 = lists:filter(fun ({T, _}) -> T /= Task end, PendingMessages),
   {noreply, State#state{pending_messages=PendingMessages2}};
 

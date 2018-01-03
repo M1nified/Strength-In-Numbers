@@ -69,6 +69,9 @@ loop(State) ->
       tcp_recv(Msg, State);
     {send_to_master, Data} ->
       send_to_master(State, Data);
+    {tcp_closed, Socket} ->
+      io:format("[~p:~p][loop] tcp_closed ~n", [?MODULE, ?FUNCTION_NAME]),
+      tcp_connect(State);
     Any ->
       io:format("[~p:~p] Msg: ~p~n", [?MODULE, ?FUNCTION_NAME, Any]), 
       loop(State)

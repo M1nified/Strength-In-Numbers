@@ -21,7 +21,7 @@
 % gen_server
 
 init(_Args) ->
-  % sin_proc:add_client(self()),
+  sin_proc:add_client(self()),
   {ok, #state{running_tasks=[],tasks_w8ing_4_modules=[]}}.
 
 handle_cast({find_master}, State) ->

@@ -106,11 +106,11 @@ handle_info({timeout, TimeRef, update_system_load}, State) ->
 
 handle_info({tcp, _Socket, MsgBin}, State) ->
   Msg = erlang:binary_to_term(MsgBin),
-  io:format("handle_info tcp: ~p~n", [Msg]),
+  io:format("[~p:~p] tcp: ~p~n", [?MODULE, ?FUNCTION_NAME, Msg]),
   tcp_recv(Msg, State);
   
 handle_info(Any, State) ->
-  io:format("handle_info any: ~p~n", [Any]),
+  io:format("[~p:~p] any: ~p~n", [?MODULE, ?FUNCTION_NAME, Any]),
   {noreply, State}.
 
 terminate(_Reason, _Tab) -> ok.
@@ -152,6 +152,10 @@ end.
 
 tcp_recv({system_load, ReqRef, SystemLoad}, State=#state{system_load_update_ref=ReqRef}) ->
   {noreply, State#state{system_load=SystemLoad, system_load_update_ref=undefined}};
+
+tcp_recv({message_to_proc, Target, Msg}, State) when erlang:is_pid(Target) ->
+  Target ! Msg,
+  {noreply, State};
 
 tcp_recv({task_exec, started, Task}, State=#state{labor_office=Lo}) ->
   gen_server:cast(Lo, {resend_messages_for_task, Task}),

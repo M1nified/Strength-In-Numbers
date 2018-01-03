@@ -20,7 +20,7 @@ init(Args) ->
     }}.
 
 handle_cast({LinkRef, {service, ServicePid}}, State) ->
-  io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, {service, ServicePid}]),
+  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, {service, ServicePid}]),
   case State#state.ref of 
     LinkRef ->
       NewState = State#state{service=ServicePid};
@@ -30,11 +30,11 @@ handle_cast({LinkRef, {service, ServicePid}}, State) ->
   {noreply, NewState};
 
 handle_cast(Request, State) ->
-  io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
+  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_call({LinkRef, {spawn, Module, Function, Args}}, _From, State) ->
-  io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, {spawn, Module, Function, Args}]),
+  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, {spawn, Module, Function, Args}]),
   case State#state.ref of
     LinkRef ->
       {ok, Pid} = gen_server:call(State#state.service, {add_task, Module, Function, Args}), 
@@ -44,15 +44,15 @@ handle_call({LinkRef, {spawn, Module, Function, Args}}, _From, State) ->
   end;
 
 handle_call(Request, _From, State) ->
-  io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
+  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_info({Fifo, {data, Data}}, State) when erlang:is_port(Fifo) ->
-  io:format("~p ~p fifo ~p ~n", [?MODULE, ?FUNCTION_NAME, Data]),
+  io:format("[~p:~p] fifo ~p ~n", [?MODULE, ?FUNCTION_NAME, Data]),
   {noreply, State};
 
 handle_info(Any, State) ->
-  io:format("~p ~p ~p ~n", [?MODULE, ?FUNCTION_NAME, Any]),
+  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Any]),
   {noreply, State}.
 
 terminate(_Reason, _Tab) -> ok.
