@@ -14,6 +14,7 @@
   leash_pid :: pid(),
   leash_ref :: reference(),
   running_tasks :: [sin_running_task()],
+  ordered_modules :: [module()],
   tasks_w8ing_4_modules :: [sin_task()]
 }).
 
@@ -22,17 +23,20 @@
 
 init(_Args) ->
   sin_proc:add_client(self()),
-  {ok, #state{running_tasks=[],tasks_w8ing_4_modules=[]}}.
+  {ok, #state{running_tasks=[],tasks_w8ing_4_modules=[],ordered_modules=[]}}.
 
 handle_cast({find_master}, State) ->
   Ref = erlang:make_ref(),
   Pid = erlang:spawn_link(sin_slave_leash, init, [self(), Ref]),
   {noreply, State#state{leash_pid=Pid,leash_ref=Ref}};
 
+handle_cast({run_task, Task}, State) ->
+  handle_cast_2({run_task, Task}, State);
+
 handle_cast({sin_slave_leash, LeashRef, MessageFromLeash}, State) ->
   io:format("[~p:~p][sin_slave_leash]~n    LeashRef: ~p~n    Message: ~p~n", [?MODULE, ?FUNCTION_NAME, LeashRef, MessageFromLeash]),
   case State#state.leash_ref of
-    LeashRef -> leash_cast(MessageFromLeash, State);
+    LeashRef -> handle_cast_2(MessageFromLeash, State);
     _ -> {noreply, State}
   end;
 
@@ -104,21 +108,35 @@ find_master(SlaveHead) ->
 
 % ---
 
-leash_cast({run_task, Task}, State) ->
+handle_cast_2({run_task, Task}, State) ->
   io:format("[~p:~p][run_task]~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, Task]),
   case list_missing_modules(Task) of
     [] -> 
       io:format("[~p:~p][run_task] Got all modules. ~n", [?MODULE, ?FUNCTION_NAME]),
       RunningTasks = State#state.running_tasks ++ [run_task(Task)],
       {noreply, State#state{running_tasks=RunningTasks}};
-    Modules ->
-      io:format("[~p:~p][run_task] Requires additional modules:~n    ~p~n", [?MODULE, ?FUNCTION_NAME, Modules]),
-      State#state.leash_pid ! {send_to_master, {get_modules, Modules}},
+    ModulesAndProblems ->
+      io:format("[~p:~p][run_task] Requires additional modules:~n    ~p~n", [?MODULE, ?FUNCTION_NAME, ModulesAndProblems]),
       TasksW8 = State#state.tasks_w8ing_4_modules ++ [Task],
-      {noreply, State#state{tasks_w8ing_4_modules=TasksW8}}
+      case lists:filtermap(fun ({Module, _Problem}) -> case lists:member(Module, State#state.ordered_modules) of true -> false; _ -> {true, Module} end end, ModulesAndProblems) of
+        [] ->
+          io:format("[~p:~p][run_task] Modules already ordered.~n", [?MODULE, ?FUNCTION_NAME]),
+          {noreply, State#state{tasks_w8ing_4_modules=TasksW8}};
+        ModulesToOrder ->
+          io:format("[~p:~p][run_task] Will order modules: ~p~n", [?MODULE, ?FUNCTION_NAME, ModulesToOrder]),
+          State#state.leash_pid ! {send_to_master, {get_modules, ModulesToOrder}},
+          OrderedModules = State#state.ordered_modules ++ ModulesToOrder,
+          {noreply, State#state{tasks_w8ing_4_modules=TasksW8, ordered_modules=OrderedModules}}
+      end
   end;
 
-leash_cast({message_to_task, Task, Msg}, State=#state{running_tasks=RunningTasks}) ->
+handle_cast_2({update_modules, Modules}, State=#state{ordered_modules=OrderedModules}) ->
+  LoadedModules = lists:map(fun (Tup={Module, _Binary, _}) -> sin_code:load_module(Tup), Module end, Modules),
+  OrderedModules2 = lists:filter(fun (Module) -> not lists:member(Module, LoadedModules) end, OrderedModules),
+  lists:foreach(fun (Task) -> gen_server:cast(self(), {run_task, Task}) end, State#state.tasks_w8ing_4_modules),
+  {noreply, State#state{ordered_modules=OrderedModules2,tasks_w8ing_4_modules=[]}};
+
+handle_cast_2({message_to_task, Task, Msg}, State=#state{running_tasks=RunningTasks}) ->
   io:format("[~p:~p][message_to_task]~n    Msg: ~p~n", [?MODULE, ?FUNCTION_NAME, Msg]),
   case lists:filter(fun (#sin_running_task{task=#sin_task{ref=TaskRef}}) -> TaskRef == Task#sin_task.ref end, RunningTasks) of
     [RTask|_] ->
@@ -128,7 +146,7 @@ leash_cast({message_to_task, Task, Msg}, State=#state{running_tasks=RunningTasks
       {noreply, State}
   end;
 
-leash_cast(_Msg, State) ->
+handle_cast_2(_Msg, State) ->
   {noreply, State}.
 
 run_task(Task) ->

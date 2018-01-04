@@ -1,4 +1,4 @@
--module(example1).
+-module(example_dev).
 
 -export([start/0]).
 -export([job_1/1]).

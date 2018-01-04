@@ -92,12 +92,14 @@ tcp_recv(Req={message_to_task, _Task, Msg}, State=#state{head_pid=HeadPid, head_
   gen_server:cast(HeadPid, {sin_slave_leash, HeadRef, Req}),
   loop(State);
 
-tcp_recv({run_task, Task}, State=#state{head_pid=HeadPid, head_ref=HeadRef}) ->
+tcp_recv(Req={run_task, Task}, State=#state{head_pid=HeadPid, head_ref=HeadRef}) ->
   io:format("[~p:~p][run_task]~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, Task]),
-  gen_server:cast(HeadPid, {sin_slave_leash, HeadRef, {run_task, Task}}),
+  gen_server:cast(HeadPid, {sin_slave_leash, HeadRef, Req}),
   loop(State);  
 
-tcp_recv({update_modules, Modules}, State) when erlang:is_list(Modules) ->
+tcp_recv(Req={update_modules, Modules}, State=#state{head_pid=HeadPid, head_ref=HeadRef}) when erlang:is_list(Modules) ->
+  io:format("[~p:~p][update_modules]~n", [?MODULE, ?FUNCTION_NAME]),
+  gen_server:cast(HeadPid, {sin_slave_leash, HeadRef, Req}),
   loop(State);
 
 tcp_recv(Msg, State) ->

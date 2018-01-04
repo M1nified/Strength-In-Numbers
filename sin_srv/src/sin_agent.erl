@@ -90,6 +90,13 @@ handle_cast({assign_task, Task}, State) ->
   gen_tcp:send(State#state.socket, erlang:term_to_binary({run_task, Task})),
   {noreply, State};
 
+handle_cast({send_modules, Modules}, State) ->
+  io:format("[~p:~p][send_modules]~n    Modules: ~p~n", [?MODULE, ?FUNCTION_NAME, Modules]),
+  Bins = sin_code:modules_to_binary(Modules),
+  Bins2 = lists:filter(fun (X) -> X =/= error end, Bins),
+  gen_tcp:send(State#state.socket, erlang:term_to_binary({update_modules, Bins2})),
+  {noreply, State};
+
 handle_cast(Request, State) ->
   io:format("handle_cast: ~p~n", [Request]),
   {noreply, State}.
@@ -159,6 +166,10 @@ tcp_recv({system_load, ReqRef, SystemLoad}, State=#state{system_load_update_ref=
 
 tcp_recv({message_to_proc, Target, Msg}, State) when erlang:is_pid(Target) ->
   Target ! Msg,
+  {noreply, State};
+
+tcp_recv({get_modules, Modules}, State) when erlang:is_list(Modules) ->
+  gen_server:cast(self(), {send_modules, Modules}),
   {noreply, State};
 
 tcp_recv({task_exec, started, Task}, State=#state{labor_office=Lo}) ->
