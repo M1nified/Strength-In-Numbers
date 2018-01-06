@@ -82,6 +82,7 @@ handle_call(Request, _From, State) ->
   {noreply, State}.
 
 handle_info({sin_proc, captured_message, to_master, MasterProc, Msg}, State) ->
+  ?DBG_INFO("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, {sin_proc, captured_message, to_master, MasterProc, Msg}]),
   State#state.leash_pid ! {send_to_master, {message_to_proc, MasterProc, Msg}},
   {noreply, State};
 
