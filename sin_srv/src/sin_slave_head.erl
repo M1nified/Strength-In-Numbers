@@ -8,6 +8,7 @@
 -export([rise/0, rise/1]).
 -export([find_master/1]).
 
+-include("./sin_debug.hrl").
 -include("./sin_task.hrl").
 
 -record(state,{
@@ -28,21 +29,21 @@ init(Options) ->
 
 handle_cast({find_master}, State) ->
   Ref = erlang:make_ref(),
-  Pid = erlang:spawn_link(sin_slave_leash, init, [self(), Ref]),
+  Pid = erlang:spawn_link(sin_slave_leash, init, [self(), Ref, State#state.options]),
   {noreply, State#state{leash_pid=Pid,leash_ref=Ref}};
 
 handle_cast({run_task, Task}, State) ->
   handle_cast_2({run_task, Task}, State);
 
 handle_cast({sin_slave_leash, LeashRef, MessageFromLeash}, State) ->
-  io:format("[~p:~p][sin_slave_leash]~n    LeashRef: ~p~n    Message: ~p~n", [?MODULE, ?FUNCTION_NAME, LeashRef, MessageFromLeash]),
+  ?DBG_INFO("[~p:~p][sin_slave_leash]~n    LeashRef: ~p~n    Message: ~p~n", [?MODULE, ?FUNCTION_NAME, LeashRef, MessageFromLeash]),
   case State#state.leash_ref of
     LeashRef -> handle_cast_2(MessageFromLeash, State);
     _ -> {noreply, State}
   end;
 
 handle_cast({execution, ExecutionRef, started}, State=#state{running_tasks=RunningTasks}) ->
-  io:format("[~p:~p][execution][started] Ref: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionRef]),
+  ?DBG_INFO("[~p:~p][execution][started] Ref: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionRef]),
   case lists:filter(fun (#sin_running_task{execution_ref=Ref}) -> Ref == ExecutionRef end, RunningTasks) of
     [] ->
       {noreply, State};
@@ -52,8 +53,8 @@ handle_cast({execution, ExecutionRef, started}, State=#state{running_tasks=Runni
   end;
 
 handle_cast({execution, ExecutionRef, finished, ExecutionResult}, State) ->
-  io:format("[~p:~p][execution][finished] Ref: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionRef]),
-  io:format("[~p:~p][execution][finished] Result: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionResult]),
+  ?DBG_INFO("[~p:~p][execution][finished] Ref: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionRef]),
+  ?DBG_INFO("[~p:~p][execution][finished] Result: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionResult]),
   case pop_from_running_tasks_by_ref(ExecutionRef, State) of
     {undefined, State2} ->
       {noreply, State2};
@@ -63,7 +64,7 @@ handle_cast({execution, ExecutionRef, finished, ExecutionResult}, State) ->
   end;
 
 handle_cast({execution, ExecutionRef, failed}, State) ->
-  io:format("[~p:~p][execution][failed] Ref: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionRef]),
+  ?DBG_INFO("[~p:~p][execution][failed] Ref: ~p~n", [?MODULE, ?FUNCTION_NAME, ExecutionRef]),
   case pop_from_running_tasks_by_ref(ExecutionRef, State) of
     {undefined, State2} ->
       {noreply, State2};
@@ -73,11 +74,11 @@ handle_cast({execution, ExecutionRef, failed}, State) ->
   end;
 
 handle_cast(Request, State) ->
-  io:format("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
+  ?DBG_INFO("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_call(Request, _From, State) ->
-  io:format("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
+  ?DBG_INFO("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_info({sin_proc, captured_message, to_master, MasterProc, Msg}, State) ->
@@ -85,7 +86,7 @@ handle_info({sin_proc, captured_message, to_master, MasterProc, Msg}, State) ->
   {noreply, State};
 
 handle_info(OtherInfo, State) ->
-  io:format("[~p:~p] ~p~n",[?MODULE,?FUNCTION_NAME,OtherInfo]),
+  ?DBG_INFO("[~p:~p] ~p~n",[?MODULE,?FUNCTION_NAME,OtherInfo]),
   {noreply, State}.
   
 terminate(_Reason, _Tab) -> ok.
@@ -110,21 +111,21 @@ find_master(SlaveHead) ->
 % ---
 
 handle_cast_2({run_task, Task}, State) ->
-  io:format("[~p:~p][run_task]~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, Task]),
+  ?DBG_INFO("[~p:~p][run_task]~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, Task]),
   case list_missing_modules(Task) of
     [] -> 
-      io:format("[~p:~p][run_task] Got all modules. ~n", [?MODULE, ?FUNCTION_NAME]),
+      ?DBG_INFO("[~p:~p][run_task] Got all modules. ~n", [?MODULE, ?FUNCTION_NAME]),
       RunningTasks = State#state.running_tasks ++ [run_task(Task)],
       {noreply, State#state{running_tasks=RunningTasks}};
     ModulesAndProblems ->
-      io:format("[~p:~p][run_task] Requires additional modules:~n    ~p~n", [?MODULE, ?FUNCTION_NAME, ModulesAndProblems]),
+      ?DBG_INFO("[~p:~p][run_task] Requires additional modules:~n    ~p~n", [?MODULE, ?FUNCTION_NAME, ModulesAndProblems]),
       TasksW8 = State#state.tasks_w8ing_4_modules ++ [Task],
       case lists:filtermap(fun ({Module, _Problem}) -> case lists:member(Module, State#state.ordered_modules) of true -> false; _ -> {true, Module} end end, ModulesAndProblems) of
         [] ->
-          io:format("[~p:~p][run_task] Modules already ordered.~n", [?MODULE, ?FUNCTION_NAME]),
+          ?DBG_INFO("[~p:~p][run_task] Modules already ordered.~n", [?MODULE, ?FUNCTION_NAME]),
           {noreply, State#state{tasks_w8ing_4_modules=TasksW8}};
         ModulesToOrder ->
-          io:format("[~p:~p][run_task] Will order modules: ~p~n", [?MODULE, ?FUNCTION_NAME, ModulesToOrder]),
+          ?DBG_INFO("[~p:~p][run_task] Will order modules: ~p~n", [?MODULE, ?FUNCTION_NAME, ModulesToOrder]),
           State#state.leash_pid ! {send_to_master, {get_modules, ModulesToOrder}},
           OrderedModules = State#state.ordered_modules ++ ModulesToOrder,
           {noreply, State#state{tasks_w8ing_4_modules=TasksW8, ordered_modules=OrderedModules}}
@@ -138,7 +139,7 @@ handle_cast_2({update_modules, Modules}, State=#state{ordered_modules=OrderedMod
   {noreply, State#state{ordered_modules=OrderedModules2,tasks_w8ing_4_modules=[]}};
 
 handle_cast_2({message_to_task, Task, Msg}, State=#state{running_tasks=RunningTasks}) ->
-  io:format("[~p:~p][message_to_task]~n    Msg: ~p~n", [?MODULE, ?FUNCTION_NAME, Msg]),
+  ?DBG_INFO("[~p:~p][message_to_task]~n    Msg: ~p~n", [?MODULE, ?FUNCTION_NAME, Msg]),
   case lists:filter(fun (#sin_running_task{task=#sin_task{ref=TaskRef}}) -> TaskRef == Task#sin_task.ref end, RunningTasks) of
     [RTask|_] ->
       RTask#sin_running_task.pid ! {message_to_task, Msg},
@@ -155,14 +156,14 @@ run_task(Task) ->
   #sin_running_task{pid=Pid,task=Task,execution_ref=ExecutionRef}.
 
 pop_from_running_tasks_by_ref(ExecutionRef, State=#state{running_tasks=RunningTasks}) ->
-  io:format("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, RunningTasks]),
+  ?DBG_INFO("[~p:~p] ~p~n", [?MODULE, ?FUNCTION_NAME, RunningTasks]),
   case lists:filter(fun (#sin_running_task{execution_ref=Ref}) -> Ref == ExecutionRef end, RunningTasks) of
     [RTask | _] ->
-      io:format("A~n"),
+      ?DBG_INFO("A~n"),
       RTasks = lists:delete(RTask, RunningTasks),
       {RTask, State#state{running_tasks=RTasks}};
     _ ->
-      io:format("B~n"),
+      ?DBG_INFO("B~n"),
       {undefined, State}
   end.
 

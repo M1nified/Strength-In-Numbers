@@ -14,6 +14,7 @@
 ]).
 
 -include("./sin_agent.hrl").
+-include("./sin_debug.hrl").
 -include("./sin_system_load.hrl").
 -include("./sin_task.hrl").
 
@@ -46,27 +47,27 @@ init(HunterConfig) ->
   }}.
 
 handle_cast({tcp_listen}, State) ->
-  io:format("~p ~p tcp_listen ~n", [?MODULE, ?FUNCTION_NAME]),
+  ?DBG_INFO("~p ~p tcp_listen ~n", [?MODULE, ?FUNCTION_NAME]),
   sin_hunter:tcp_listen(State#state.hunter),
   {noreply, State};
   
 handle_cast({tcp_accept, ListenSocket}, State)->
-  io:format("~p ~p tcp_accept (1) ~n", [?MODULE, ?FUNCTION_NAME]),
+  ?DBG_INFO("~p ~p tcp_accept (1) ~n", [?MODULE, ?FUNCTION_NAME]),
   case sin_agent:start() of
     {ok, Agent=#sin_agent{pid=Pid}} ->
-      io:format("~p ~p tcp_accept (2.1) ~n", [?MODULE, ?FUNCTION_NAME]),
-      Ref = erlang:make_ref(),
+      ?DBG_INFO("~p ~p tcp_accept (2.1) ~n", [?MODULE, ?FUNCTION_NAME]),
+      Ref = erlang:monitor(process, Pid),
       gen_server:cast(Pid, {tcp_accept, ListenSocket, self(), Ref}),
       {noreply, State#state{
         acceptors = State#state.acceptors ++ [{Ref, Agent}]
       }};
     _ -> 
-      io:format("~p ~p tcp_accept (2.2) ~n", [?MODULE, ?FUNCTION_NAME]),
+      ?DBG_INFO("~p ~p tcp_accept (2.2) ~n", [?MODULE, ?FUNCTION_NAME]),
       {noreply, State}
   end;
 
 handle_cast({tcp_accepted, Ref}, State) when erlang:is_reference(Ref) ->
-  io:format("~p ~p tcp_accepted ~n", [?MODULE, ?FUNCTION_NAME]),
+  ?DBG_INFO("~p ~p tcp_accepted ~n", [?MODULE, ?FUNCTION_NAME]),
   case proplists:get_value(Ref, State#state.acceptors) of
     undefined -> {noreply, State};
     Agent ->  % sin_agent()
@@ -79,21 +80,21 @@ handle_cast({tcp_accepted, Ref}, State) when erlang:is_reference(Ref) ->
   end;
 
 handle_cast({info, show_state}, State) ->
-  io:format("~p state is:~n~p~n",[?MODULE, State]),
+  ?DBG_INFO("~p state is:~n~p~n",[?MODULE, State]),
   {noreply, State};
 
 handle_cast({resend_messages_for_task, Task=#sin_task{ref=TaskRef}}, State=#state{pending_messages=PendingMessages}) ->
-  io:format("[~p:~p][resend_messages_for_task]~n", [?MODULE, ?FUNCTION_NAME]),
-  io:format("[~p:~p][resend_messages_for_task] All PendingMessages: ~p~n", [?MODULE, ?FUNCTION_NAME, PendingMessages]),
+  ?DBG_INFO("[~p:~p][resend_messages_for_task]~n", [?MODULE, ?FUNCTION_NAME]),
+  ?DBG_INFO("[~p:~p][resend_messages_for_task] All PendingMessages: ~p~n", [?MODULE, ?FUNCTION_NAME, PendingMessages]),
   Queue = lists:filtermap(fun ({#sin_task{ref=Ref},Msg}) -> case Ref==TaskRef of true -> {true, Msg}; _ -> false end end, PendingMessages),
-  io:format("[~p:~p][resend_messages_for_task] Queue: ~p~n", [?MODULE, ?FUNCTION_NAME, Queue]),
+  ?DBG_INFO("[~p:~p][resend_messages_for_task] Queue: ~p~n", [?MODULE, ?FUNCTION_NAME, Queue]),
   lists:foreach(fun (Msg) -> gen_server:cast(self(), {message_to_task, Task, Msg}) end, Queue),
   PendingMessages2 = lists:filter(fun ({T, _}) -> T /= Task end, PendingMessages),
   {noreply, State#state{pending_messages=PendingMessages2}};
 
 handle_cast(Request={message_to_task, Task=#sin_task{ref=Ref}, Message}, State=#state{assigned_tasks=AssignedTasks}) ->
-  io:format("[~p:~p][message_to_task]~n    Task: ~p~n    Message: ~p~n", [?MODULE, ?FUNCTION_NAME, Task, Message]),
-  io:format("[~p:~p][message_to_task]~n    AssignedTasks: ~p~n", [?MODULE, ?FUNCTION_NAME, AssignedTasks]),
+  ?DBG_INFO("[~p:~p][message_to_task]~n    Task: ~p~n    Message: ~p~n", [?MODULE, ?FUNCTION_NAME, Task, Message]),
+  ?DBG_INFO("[~p:~p][message_to_task]~n    AssignedTasks: ~p~n", [?MODULE, ?FUNCTION_NAME, AssignedTasks]),
   case lists:filter(fun ({#sin_task{ref=R}, _}) -> R == Ref end, AssignedTasks) of
     [] ->
       {noreply, State#state{pending_messages=State#state.pending_messages++[{Task, Message}]}};
@@ -103,7 +104,7 @@ handle_cast(Request={message_to_task, Task=#sin_task{ref=Ref}, Message}, State=#
   end;
 
 handle_cast({assign_task, AgentRef, Task}, State) when erlang:is_reference(AgentRef) ->
-  io:format("[~p:~p][assign_task] ~n    Agent: ~p~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, AgentRef, Task]),
+  ?DBG_INFO("[~p:~p][assign_task] ~n    Agent: ~p~n    Task: ~p~n", [?MODULE, ?FUNCTION_NAME, AgentRef, Task]),
   case proplists:get_value(AgentRef, State#state.agents) of
     undefined ->
       {noreply, State};
@@ -112,15 +113,32 @@ handle_cast({assign_task, AgentRef, Task}, State) when erlang:is_reference(Agent
       {noreply, State#state{assigned_tasks=State#state.assigned_tasks++[{Task, Agent}]}}
   end;
 
+handle_cast({restart_tasks_for_agent, Agent}, State=#state{assigned_tasks=AssignedTasks}) ->
+  Tasks = lists:filtermap(fun ({Task, Ag}) -> case Ag == Agent of true -> {true, Task}; _ -> false end end, AssignedTasks),
+  AssignedTasks2 = lists:filter(fun ({_, Ag}) -> Ag /= Agent end, AssignedTasks),
+  lists:foreach(fun (Task) -> State#state.scheduler ! {restart_task, Task} end, Tasks),
+  {noreply, State#state{assigned_tasks=AssignedTasks2}};
+
+handle_cast({agent_down, AgentRef}, State) ->
+  ?DBG_INFO("[~p:~p][agent_down] ~p~n",[?MODULE, ?FUNCTION_NAME, AgentRef]),
+  case proplists:get_value(AgentRef, State#state.agents) of
+    undefined ->
+      {noreply, State};
+    Agent ->
+      Agents = lists:delete({AgentRef, Agent}, State#state.agents),
+      gen_server:cast(self(), {restart_tasks_for_agent, Agent}),
+      {noreply, State#state{agents=Agents}}
+  end;
+
 handle_cast(Request, State) ->
-  io:format("handle_cast: ~p~n", [Request]),
+  ?DBG_INFO("handle_cast: ~p~n", [Request]),
   {noreply, State}.
 
 handle_call({add_task, Module, Function, Args}, _From, State) ->
-  io:format("[~p:~p][add_task] ~p:~p~p~n",[?MODULE, ?FUNCTION_NAME, Module, Function,Args]),
+  ?DBG_INFO("[~p:~p][add_task] ~p:~p~p~n",[?MODULE, ?FUNCTION_NAME, Module, Function,Args]),
   Ref = erlang:make_ref(),
   State#state.scheduler ! {add_task, Module, Function, Args, self(), Ref},
-  io:format("[~p:~p][add_task] ~p:~p~p SENT TO SCHEDULER!!!~n",[?MODULE, ?FUNCTION_NAME, Module, Function,Args]),  
+  ?DBG_INFO("[~p:~p][add_task] ~p:~p~p SENT TO SCHEDULER!!!~n",[?MODULE, ?FUNCTION_NAME, Module, Function,Args]),  
   receive
     {task_sim, Ref, TaskSimPid} ->
       {reply, {ok, TaskSimPid}, State}
@@ -142,11 +160,16 @@ handle_call({get_best_slave}, _From, State) ->
   {reply, {fail, no_agent}, State};
 
 handle_call(Request, _From, State) ->
-  io:format("handle_call: ~p~n", [Request]),
+  ?DBG_INFO("handle_call: ~p~n", [Request]),
   {noreply, State}.
 
+handle_info({"DOWN", MonitorRef, _, _, _}, State) ->
+  ?DBG_INFO("[~p:~p] DOWN", [?MODULE,?FUNCTION_NAME]),
+  gen_server:cast(self(), {agent_down, MonitorRef}),
+  {noreply, State};
+
 handle_info(OtherInfo, State) ->
-  io:format("~p ~p ~p~n",[?MODULE,?FUNCTION_NAME,OtherInfo]),
+  ?DBG_INFO("~p ~p ~p~n",[?MODULE,?FUNCTION_NAME,OtherInfo]),
   {noreply, State}.
 
 terminate(_Reason, _Tab) -> ok.

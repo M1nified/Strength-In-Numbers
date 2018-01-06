@@ -25,10 +25,14 @@ start(Args) ->
     {ok, Link, LinkRef}.
 
 spawn({Link, LinkRef}, Module, Function, Args) ->
-    case gen_server:call(Link, {LinkRef, {spawn, Module, Function, Args}}) of
+    try gen_server:call(Link, {LinkRef, {spawn, Module, Function, Args}}) of
         {ok, Pid} -> 
             Pid;
-        _ -> {error}
+        _ -> 
+            {error}
+    catch
+        _:Reason ->
+            {error, Reason}
     end.
 
 master_pid(Pid) ->

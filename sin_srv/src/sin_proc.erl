@@ -8,6 +8,8 @@
 
 -export([pid/1, master_pid/1, add_client/1]).
 
+-include("./sin_debug.hrl").
+
 -record(state,{
   fake_ref :: reference(),
   clients :: [pid()],
@@ -15,38 +17,38 @@
 }).
 
 init(_Args) ->
-  io:format("[~p:~p]~n",[?MODULE,?FUNCTION_NAME]),
+  ?DBG_INFO("[~p:~p]~n",[?MODULE,?FUNCTION_NAME]),
   {ok, #state{master_pids=[], fake_ref=erlang:make_ref(), clients=[]}}.
 
 handle_cast({add_client, ClientPid}, State=#state{clients=Clients}) ->
-  io:format("[~p:~p][add_client] Client: ~p~n",[?MODULE,?FUNCTION_NAME, ClientPid]),
+  ?DBG_INFO("[~p:~p][add_client] Client: ~p~n",[?MODULE,?FUNCTION_NAME, ClientPid]),
   case lists:member(ClientPid, Clients) of
     true ->
-      io:format("[~p:~p][add_client] true: ~p~n",[?MODULE,?FUNCTION_NAME, ClientPid]),
+      ?DBG_INFO("[~p:~p][add_client] true: ~p~n",[?MODULE,?FUNCTION_NAME, ClientPid]),
       {noreply, State};
     _ ->
-      io:format("[~p:~p][add_client] false: ~p~n",[?MODULE,?FUNCTION_NAME, ClientPid]),
+      ?DBG_INFO("[~p:~p][add_client] false: ~p~n",[?MODULE,?FUNCTION_NAME, ClientPid]),
       {noreply, State#state{clients=Clients++[ClientPid]}}
   end;
 
 handle_cast({fake_proc, FakeProc, OriginalPid, {msg, Msg}}, State=#state{master_pids=MasterPids}) when erlang:is_pid(FakeProc) and erlang:is_pid(OriginalPid) ->
-  io:format("[~p:~p][fake_proc] Request: ~p~n",[?MODULE,?FUNCTION_NAME, {fake_proc, FakeProc, OriginalPid, Msg}]),
+  ?DBG_INFO("[~p:~p][fake_proc] Request: ~p~n",[?MODULE,?FUNCTION_NAME, {fake_proc, FakeProc, OriginalPid, Msg}]),
   case proplists:get_value(OriginalPid, MasterPids) of
     undefined ->
-      io:format("[~p:~p][fake_proc] undefined~n",[?MODULE,?FUNCTION_NAME]),
+      ?DBG_INFO("[~p:~p][fake_proc] undefined~n",[?MODULE,?FUNCTION_NAME]),
       send_to_all_clients({?MODULE, captured_message, to_master, OriginalPid, Msg}, State),
       {noreply, State};
     FakeProc ->
-      io:format("[~p:~p][fake_proc] FakeProc: ~p~n",[?MODULE,?FUNCTION_NAME, FakeProc]),
+      ?DBG_INFO("[~p:~p][fake_proc] FakeProc: ~p~n",[?MODULE,?FUNCTION_NAME, FakeProc]),
       send_to_all_clients({?MODULE, captured_message, to_master, OriginalPid, Msg}, State),
       {noreply, State};
     Else ->
-      io:format("[~p:~p][fake_proc] Else: ~p~n",[?MODULE,?FUNCTION_NAME, Else]),
+      ?DBG_INFO("[~p:~p][fake_proc] Else: ~p~n",[?MODULE,?FUNCTION_NAME, Else]),
       {noreply, State}
   end;
 
 handle_cast(Request, State) ->
-  io:format("[~p:~p] Request: ~p~n",[?MODULE,?FUNCTION_NAME, Request]),
+  ?DBG_INFO("[~p:~p] Request: ~p~n",[?MODULE,?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_call({get_fake_master_pid, OriginalPid}, _From, State=#state{master_pids=MasterPids}) ->
@@ -59,11 +61,11 @@ handle_call({get_fake_master_pid, OriginalPid}, _From, State=#state{master_pids=
   end;
 
 handle_call(Request, _From, State) ->
-  io:format("[~p:~p] Request: ~p~n",[?MODULE,?FUNCTION_NAME, Request]),
+  ?DBG_INFO("[~p:~p] Request: ~p~n",[?MODULE,?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_info(Request, State) ->
-  io:format("[~p:~p] Request: ~p~n",[?MODULE,?FUNCTION_NAME, Request]),
+  ?DBG_INFO("[~p:~p] Request: ~p~n",[?MODULE,?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 terminate(_Reason, _Tab) -> ok.
@@ -122,7 +124,7 @@ get_proc_srv() ->
   end.
 
 send_to_all_clients(Msg, State=#state{clients=Clients}) ->
-  io:format("[~p:~p] State: ~p~n",[?MODULE,?FUNCTION_NAME, State]),
+  ?DBG_INFO("[~p:~p] State: ~p~n",[?MODULE,?FUNCTION_NAME, State]),
   lists:foreach(fun (Pid) -> Pid ! Msg end, Clients).
       
 make_fake_proc(OriginalPid) ->
@@ -134,7 +136,7 @@ fake_proc_main(OriginalPid) ->
 fake_proc_loop(State={OriginalPid}) ->
   receive
     Msg ->
-      io:format("[~p:~p] Msg: ~p~n",[?MODULE,?FUNCTION_NAME, Msg]),
+      ?DBG_INFO("[~p:~p] Msg: ~p~n",[?MODULE,?FUNCTION_NAME, Msg]),
       gen_server:cast(get_proc_srv(), {fake_proc, self(), OriginalPid, {msg, Msg}}),
       fake_proc_loop(State)
   end.

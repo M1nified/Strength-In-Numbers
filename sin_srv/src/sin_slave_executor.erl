@@ -37,6 +37,6 @@ execute_3(Self, Ref, Task) ->
     ExecutionResult ->
       Self ! {Ref, execution_result, ExecutionResult}
   catch
-    Error ->
-      Self ! {Ref, execution_result, Error}
+    _:Reason ->
+      Self ! {Ref, execution_result, {error, Reason}}
   end.

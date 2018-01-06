@@ -2,6 +2,7 @@
 
 -export([start/0]).
 
+-include("./sin_debug.hrl").
 -include("./sin_task.hrl").
 
 -record(state, {
@@ -23,7 +24,7 @@ loop(State1) ->
     State2 = loop_actions(State1),
     receive
         Any -> 
-            io:format("[~p:~p] Received Any: ~p~n",[?MODULE,?FUNCTION_NAME,Any]),
+            ?DBG_INFO("[~p:~p] Received Any: ~p~n",[?MODULE,?FUNCTION_NAME,Any]),
             recv(Any, State2)
     after 
         1 ->
@@ -46,14 +47,14 @@ assign_task(State) ->
 
 -spec assign_task_2(any(), any(), state()) -> state().
 assign_task_2({_,Task}, _BestSlave={ok, AgentRef}, State=#state{labor_office=LOPid}) ->
-    io:format("[~p:~p] AgentRef: ~p~n",[?MODULE, ?FUNCTION_NAME, AgentRef]),
+    ?DBG_INFO("[~p:~p] AgentRef: ~p~n",[?MODULE, ?FUNCTION_NAME, AgentRef]),
     sin_labor_office:assign_task(LOPid, AgentRef, Task),
     State#state{no_agent_counter=0};
 assign_task_2(Task, {fail, no_agent}, State=#state{task_queue=TaskQueue,no_agent_counter=NACounter}) ->
-    case NACounter rem 100000 of 0 -> io:format("[~p:~p] no_agent~n",[?MODULE, ?FUNCTION_NAME]); _ -> ok end,
+    case NACounter rem 100000 of 0 -> ?DBG_INFO("[~p:~p] no_agent~n",[?MODULE, ?FUNCTION_NAME]); _ -> ok end,
     State#state{task_queue=TaskQueue ++ [Task], no_agent_counter=NACounter+1};
 assign_task_2(Task, {fail, no_free_agent}, State=#state{task_queue=TaskQueue,no_agent_counter=NACounter}) ->
-    case NACounter rem 100 of 0 -> io:format("[~p:~p] no_free_agent~n",[?MODULE, ?FUNCTION_NAME]); _ -> ok end,
+    case NACounter rem 100 of 0 -> ?DBG_INFO("[~p:~p] no_free_agent~n",[?MODULE, ?FUNCTION_NAME]); _ -> ok end,
     State#state{task_queue=TaskQueue ++ [Task], no_agent_counter=NACounter+1}.
 
 -spec recv(tuple(), state()) -> any().
@@ -64,8 +65,19 @@ recv({task_sim, Task, task_msg, Msg}, State=#state{labor_office=LaborOffice}) ->
     gen_server:cast(LaborOffice, {message_to_task, Task, Msg}),
     loop(State);
 
+recv({restart_task, Task}, State=#state{task_sims=TaskSims}) ->
+    ?DBG_INFO("[~p:~p][restart_task]~n",[?MODULE,?FUNCTION_NAME]),
+    case lists:filter(fun ({_, T}) -> T == Task end, TaskSims) of
+        [] ->
+            loop(State);
+        [{TaskSim,TheTask}|_] ->
+            Queue = State#state.task_queue ++ [{TaskSim, TheTask}],
+            loop(State#state{task_queue = Queue})
+    end;
+    
+
 recv({add_task, Module, Function, Args, From, RequestRef}, State) ->
-    io:format("[~p:~p][add_task] ~p:~p~p~n",[?MODULE,?FUNCTION_NAME,Module,Function,Args]),
+    ?DBG_INFO("[~p:~p][add_task] ~p:~p~p~n",[?MODULE,?FUNCTION_NAME,Module,Function,Args]),
     Task = #sin_task{
         ref=erlang:make_ref(),
         spawn_3={Module, Function, Args},
@@ -80,5 +92,5 @@ recv({add_task, Module, Function, Args, From, RequestRef}, State) ->
     loop(State2);
 
 recv(Request, State) ->
-    io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
+    ?DBG_INFO("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
     loop(State).

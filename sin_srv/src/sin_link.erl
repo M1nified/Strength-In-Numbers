@@ -7,6 +7,8 @@
 
 -export([open/0]).
 
+-include("./sin_debug.hrl").
+
 -record(state,{
   parent :: pid(),
   ref :: reference(),
@@ -20,7 +22,7 @@ init(Args) ->
     }}.
 
 handle_cast({LinkRef, {service, ServicePid}}, State) ->
-  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, {service, ServicePid}]),
+  ?DBG_INFO("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, {service, ServicePid}]),
   case State#state.ref of 
     LinkRef ->
       NewState = State#state{service=ServicePid};
@@ -30,29 +32,36 @@ handle_cast({LinkRef, {service, ServicePid}}, State) ->
   {noreply, NewState};
 
 handle_cast(Request, State) ->
-  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
+  ?DBG_INFO("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_call({LinkRef, {spawn, Module, Function, Args}}, _From, State) ->
-  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, {spawn, Module, Function, Args}]),
+  ?DBG_INFO("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, {spawn, Module, Function, Args}]),
   case State#state.ref of
     LinkRef ->
-      {ok, Pid} = gen_server:call(State#state.service, {add_task, Module, Function, Args}), 
-      {reply, {ok, Pid}, State};
+      try gen_server:call(State#state.service, {add_task, Module, Function, Args}) of
+        {ok, Pid} ->
+          {reply, {ok, Pid}, State};
+        Else ->
+          {reply, Else, State}
+      catch
+        _:Reason ->
+          {reply, {error, Reason}, State}
+      end;
     _ ->
       {reply, {error}, State}
   end;
 
 handle_call(Request, _From, State) ->
-  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
+  ?DBG_INFO("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Request]),
   {noreply, State}.
 
 handle_info({Fifo, {data, Data}}, State) when erlang:is_port(Fifo) ->
-  io:format("[~p:~p] fifo ~p ~n", [?MODULE, ?FUNCTION_NAME, Data]),
+  ?DBG_INFO("[~p:~p] fifo ~p ~n", [?MODULE, ?FUNCTION_NAME, Data]),
   {noreply, State};
 
 handle_info(Any, State) ->
-  io:format("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Any]),
+  ?DBG_INFO("[~p:~p] ~p ~n", [?MODULE, ?FUNCTION_NAME, Any]),
   {noreply, State}.
 
 terminate(_Reason, _Tab) -> ok.
