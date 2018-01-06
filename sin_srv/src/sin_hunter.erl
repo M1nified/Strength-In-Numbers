@@ -36,8 +36,8 @@ tcp_listen(Hunter) ->
     {packet, 4},
     {active, true},
     {keepalive, true},
-    {port, proplists:get_value(slaves_port, Hunter#hunter.config, 0)},
-    {ifaddr, proplists:get_value(interface_ip, Hunter#hunter.config, {127,0,0,1})},
+    {port, proplists:get_value(port, Hunter#hunter.config, 3456)},
+    {ifaddr, proplists:get_value(ip, Hunter#hunter.config, {127,0,0,1})},
     proplists:get_value(inet, Hunter#hunter.config, inet)
   ],
   io:format("tcp_listen options:~p~n", [Options]),

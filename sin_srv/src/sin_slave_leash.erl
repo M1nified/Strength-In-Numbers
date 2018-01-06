@@ -33,8 +33,8 @@ find_pole(State) ->
 tcp_connect(State) ->
   io:format("[~p:~p/~p] Slave is looking for the Master...~n", [?MODULE, ?FUNCTION_NAME, ?FUNCTION_ARITY]),
   case gen_tcp:connect(
-    proplists:get_value(master_ip, State#state.tcp_options, {127,0,0,1}),
-    proplists:get_value(master_port, State#state.tcp_options, 3456),
+    proplists:get_value(ip, State#state.tcp_options, {127,0,0,1}),
+    proplists:get_value(port, State#state.tcp_options, 3456),
     [
       binary,
       {packet, 4},

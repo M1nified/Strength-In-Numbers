@@ -13,6 +13,7 @@
 -record(state,{
   leash_pid :: pid(),
   leash_ref :: reference(),
+  options :: [{term(), any()}],
   running_tasks :: [sin_running_task()],
   ordered_modules :: [module()],
   tasks_w8ing_4_modules :: [sin_task()]
@@ -21,9 +22,9 @@
 % ---
 % gen_server
 
-init(_Args) ->
+init(Options) ->
   sin_proc:add_client(self()),
-  {ok, #state{running_tasks=[],tasks_w8ing_4_modules=[],ordered_modules=[]}}.
+  {ok, #state{options=Options,running_tasks=[],tasks_w8ing_4_modules=[],ordered_modules=[]}}.
 
 handle_cast({find_master}, State) ->
   Ref = erlang:make_ref(),

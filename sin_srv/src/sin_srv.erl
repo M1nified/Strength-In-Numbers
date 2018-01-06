@@ -47,16 +47,16 @@ register(undefined) ->
 register(_RunningServerPid) ->
     {error, "Server already running."}.
 
-start_services(ok, Args) ->
-    select_role_and_run(lists:last(Args)),
+start_services(ok, [Mode|Options]) ->
+    select_role_and_run(Mode, Options),
     receive
         Any -> io:format("Rec ~p~n",[Any])
     end;
-start_services(_RegisterResult, _Args) ->
+start_services(_RegisterResult, _Options) ->
     {error, "Failed."}.
 
-start_services(ok, Args, {Link, LinkRef}) ->
-    case select_role_and_run(lists:last(Args)) of
+start_services(ok, [Mode|Options], {Link, LinkRef}) ->
+    case select_role_and_run(Mode, Options) of
         {ok, Service} ->
             gen_server:cast(Link, {LinkRef, {service, Service}});
         _ -> fail
@@ -64,23 +64,23 @@ start_services(ok, Args, {Link, LinkRef}) ->
 start_services(_RegisterResult, _Args, _) ->
     {error, "Failed."}.
 
-select_role_and_run("master") ->
-    select_role_and_run(master);
-select_role_and_run("slave") ->
-    select_role_and_run(slave);
+select_role_and_run("master", Options) ->
+    select_role_and_run(master, Options);
+select_role_and_run("slave", Options) ->
+    select_role_and_run(slave, Options);
 
-select_role_and_run(master) ->
+select_role_and_run(master, Options) ->
     io:format("Starting master server!~n"),
-    {ok, LaborOffice} = sin_labor_office:open([{slaves_port, 3456}]),
+    {ok, LaborOffice} = sin_labor_office:open(Options),
     gen_server:cast(LaborOffice, {tcp_listen}),
     {ok, LaborOffice};
-select_role_and_run(slave) ->
+select_role_and_run(slave, Options) ->
     io:format("Starting slave server!~n"),
-    case sin_slave_head:rise() of
+    case sin_slave_head:rise(Options) of
         {ok, SlaveHead} ->
             sin_slave_head:find_master(SlaveHead),
             {ok, SlaveHead};
         _ -> error
     end;
-select_role_and_run(_UnknownRole) ->
+select_role_and_run(_UnknownRole, _Options) ->
     {error, unknown_role}.
