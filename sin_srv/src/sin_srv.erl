@@ -4,6 +4,7 @@
 -export([main/1]).
 -export([start/1]).
 -export([spawn/4]).
+-export([master_pid/1]).
 
 %%====================================================================
 %% API functions
@@ -29,6 +30,9 @@ spawn({Link, LinkRef}, Module, Function, Args) ->
             Pid;
         _ -> {error}
     end.
+
+master_pid(Pid) ->
+    sin_proc:master_pid(Pid).
 
 %%====================================================================
 %% Internal functions
