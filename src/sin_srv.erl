@@ -1,5 +1,8 @@
 -module(sin_srv).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 %% API exports
 -export([main/1]).
 -export([start/1]).

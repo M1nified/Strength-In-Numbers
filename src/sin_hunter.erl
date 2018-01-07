@@ -1,5 +1,8 @@
 -module(sin_hunter).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -export([
   make/2
 ]).

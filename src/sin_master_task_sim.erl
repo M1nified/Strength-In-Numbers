@@ -1,5 +1,8 @@
 -module(sin_master_task_sim).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -export([start/2]).
 
 -record(state, {

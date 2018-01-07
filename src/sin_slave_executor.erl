@@ -1,5 +1,8 @@
 -module(sin_slave_executor).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -export([execute/2, execute/3]).
 
 -include("./sin_task.hrl").

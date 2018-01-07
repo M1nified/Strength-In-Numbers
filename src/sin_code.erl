@@ -1,5 +1,8 @@
 -module(sin_code).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -export([module_to_binary/1,modules_to_binary/1]).
 -export([load_module/1]).
 

@@ -1,5 +1,8 @@
 -module(sin_agent).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -define(INTERVAL, 30000).
 
 -behaviour(gen_server).

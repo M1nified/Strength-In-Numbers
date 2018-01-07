@@ -1,5 +1,8 @@
 -module(sin_labor_office).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -behaviour(gen_server).
 -export([init/1]).
 -export([handle_cast/2, handle_call/3, handle_info/2]).

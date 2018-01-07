@@ -1,5 +1,7 @@
 -module(sin_proc).
 
+-author("Michał Góra").
+-vsn("1.0").
 
 -behaviour(gen_server).
 -export([init/1]).

@@ -1,5 +1,8 @@
 -module(sin_system_load).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -export([start/0,stop/0]).
 -export([get_system_load/0]).
 

@@ -1,5 +1,8 @@
 -module(sin_master_scheduler).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -export([start/0]).
 
 -include("./sin_debug.hrl").

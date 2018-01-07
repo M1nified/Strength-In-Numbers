@@ -1,5 +1,8 @@
 -module(sin_slave_leash).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -export([init/2, init/3]).
 
 -include("./sin_debug.hrl").

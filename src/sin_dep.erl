@@ -1,5 +1,8 @@
 -module(sin_dep).
 
+-author("Michał Góra").
+-vsn("1.0").
+
 -export([needs/1]).
 -export([fun_needs/3, fun_needs_modules/1, fun_needs_modules/3]).
 -export([filter_loaded/1]).
