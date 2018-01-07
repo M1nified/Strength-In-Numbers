@@ -18,12 +18,14 @@ main(Args) ->
     start_services(register_single_instance(), Args),
     erlang:halt(0).
 
+-spec start(list()) -> {ok, pid(), reference()}.
 start(Args) ->
     {ok, Link, LinkRef} = sin_link:open(),
     io:format("Link: ~p~n",[Link]),
     start_services(register_single_instance(), Args, {Link, LinkRef}),
     {ok, Link, LinkRef}.
 
+-spec spawn({pid(), reference()}, module(), atom(), list()) -> pid() | {error} | {error, any()}.
 spawn({Link, LinkRef}, Module, Function, Args) ->
     try gen_server:call(Link, {LinkRef, {spawn, Module, Function, Args}}) of
         {ok, Pid} -> 
@@ -35,6 +37,7 @@ spawn({Link, LinkRef}, Module, Function, Args) ->
             {error, Reason}
     end.
 
+-spec master_pid(pid()) -> pid().
 master_pid(Pid) ->
     sin_proc:master_pid(Pid).
 
