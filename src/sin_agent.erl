@@ -197,10 +197,10 @@ tcp_recv({task_exec, started, Task}, State=#state{labor_office=Lo}) ->
   gen_server:cast(Lo, {resend_messages_for_task, Task}),
   {noreply, State};
 
-tcp_recv({task_exec, finished, Task, ExecutionResult}, State) ->
+tcp_recv({task_exec, finished, _Task, _ExecutionResult}, State) ->
   {noreply, State};
 
-tcp_recv({task_exec, failed, Task}, State) ->
+tcp_recv({task_exec, failed, _Task}, State) ->
   {noreply, State};
 
 tcp_recv(Msg, State) ->
@@ -219,5 +219,5 @@ assign_task(_Agent=#sin_agent{pid=Pid}, Task) ->
 
 cast(AgentPid, Message) when erlang:is_pid(AgentPid) ->
   gen_server:cast(AgentPid, Message);
-cast(Agent=#sin_agent{pid=Pid}, Message) ->
+cast(_Agent=#sin_agent{pid=Pid}, Message) ->
   cast(Pid, Message).

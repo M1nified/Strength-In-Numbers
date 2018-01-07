@@ -101,9 +101,9 @@ get_fake_pid(Srv, Pid) ->
 get_fake_master_pid(Srv, Pid) ->
   gen_server:call(Srv, {get_fake_master_pid, Pid}).
   
--spec get_original_pid(pid(),pid()) -> pid().
-get_original_pid(Srv, Pid) ->
-  gen_server:call(Srv, {get_original_pid, Pid}).
+% -spec get_original_pid(pid(),pid()) -> pid().
+% get_original_pid(Srv, Pid) ->
+%   gen_server:call(Srv, {get_original_pid, Pid}).
 
 % ---
 
